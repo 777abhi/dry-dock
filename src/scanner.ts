@@ -7,10 +7,13 @@ export interface ScanResult {
     hash: string;
     project: string;
     path: string;
+    lines: number;
 }
 
 export function scanFile(filePath: string): ScanResult | null {
     const content = fs.readFileSync(filePath, 'utf-8');
+    const lines = content.split(/\r?\n/).length;
+
     // Default to 'unknown' format if detection fails, though jscpd usually handles extensions well.
     // If format is unknown, jscpd might not tokenize correctly.
     const format = getFormatByFile(filePath) || 'javascript';
@@ -72,6 +75,7 @@ export function scanFile(filePath: string): ScanResult | null {
     return {
         hash,
         project,
-        path: filePath
+        path: filePath,
+        lines
     };
 }

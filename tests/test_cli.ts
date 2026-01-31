@@ -35,21 +35,28 @@ function run() {
         // We'll run from repo root.
         const cmd = `npx ts-node src/drydock.ts ${fixtureRoot}`;
         const output = execSync(cmd, { encoding: 'utf-8', cwd: process.cwd() });
-        const json = JSON.parse(output);
+        const report = JSON.parse(output);
 
-        // console.log('CLI Output:', JSON.stringify(json, null, 2));
+        // console.log('CLI Output:', JSON.stringify(report, null, 2));
 
         // Check for duplicate hash
-        const values = Object.values(json) as any[];
-        const duplicateEntry = values.find(v => v.length === 2);
+        const duplicateEntry = report.find((v: any) => v.occurrences.length === 2);
 
         if (duplicateEntry) {
             console.log('PASS: Found duplicate entry.');
-            const projects = duplicateEntry.map((o: any) => o.project).sort();
+            const projects = duplicateEntry.occurrences.map((o: any) => o.project).sort();
             if (JSON.stringify(projects) === JSON.stringify(['projA', 'projB'])) {
                 console.log('PASS: Projects identified correctly.');
             } else {
                 console.error('FAIL: Projects mismatch:', projects);
+                process.exit(1);
+            }
+
+            // Verify RefactorScore components
+            if (duplicateEntry.spread === 2 && duplicateEntry.frequency === 2 && duplicateEntry.isLibraryCandidate === true) {
+                console.log('PASS: RefactorScore metrics for duplicate correct.');
+            } else {
+                console.error('FAIL: RefactorScore metrics mismatch:', duplicateEntry);
                 process.exit(1);
             }
         } else {
@@ -58,9 +65,15 @@ function run() {
         }
 
         // Check unique
-        const uniqueEntry = values.find(v => v.length === 1 && v[0].project === 'projC');
+        const uniqueEntry = report.find((v: any) => v.occurrences.length === 1 && v.occurrences[0].project === 'projC');
         if (uniqueEntry) {
             console.log('PASS: Found unique entry.');
+            if (uniqueEntry.spread === 1 && uniqueEntry.isLibraryCandidate === false) {
+                console.log('PASS: RefactorScore metrics for unique correct.');
+            } else {
+                console.error('FAIL: RefactorScore metrics mismatch for unique:', uniqueEntry);
+                process.exit(1);
+            }
         } else {
             console.error('FAIL: Unique entry for projC not found.');
              process.exit(1);
