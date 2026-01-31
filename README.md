@@ -11,6 +11,25 @@ DryDock is a utility for detecting code duplication across repositories.
 - **Project Root Detection:** Automatically identifies project boundaries using `package.json`, `go.mod`, or `.git`.
 - **CLI Support:** Simple command-line interface with file globbing and dashboard launch control (`--open`).
 - **JSON Reporting:** Outputs detailed analysis to `drydock-report.json`.
+- **Git Blame Integration:** Automatically fetches author and date information for duplicated code blocks if available.
+
+## CLI Options
+
+| Option | Description |
+|--------|-------------|
+| `--open` | Launch the interactive dashboard after scanning. |
+| `--min-lines <n>` | Minimum number of lines for a block to be considered a duplicate (default: 0). |
+| `--fail` | Exit with code 1 if cross-project leaks are detected (useful for CI/CD). |
+
+## Configuration
+
+You can create a `.drydockignore` file in the current directory to exclude specific files or directories from the scan. The format is similar to `.gitignore`.
+
+Example `.drydockignore`:
+```
+src/generated/**
+*.test.ts
+```
 
 ## Verifying the Installation
 
@@ -35,15 +54,21 @@ The dashboard highlights:
 - A high **RefactorScore** for the duplicated `duplicate()` function.
 - A **Leakage Matrix** showing the connection between `app-1` and `app-2`.
 
+### Code Inspector
+
+You can now inspect the duplicated code directly in the dashboard by clicking the "Inspect Code" button on any leakage item. This opens a side-by-side comparison of the normalized code occurrences.
+
+![DryDock Clone Inspector](drydock-inspector.png)
+
 ## Roadmap: Next 20 Features
 
 The following features are planned to further improve the utility:
 
-1. **Configurable Ignore Patterns:** Support `.drydockignore` to exclude specific files or directories.
-2. **Code Preview in Dashboard:** View the actual source code side-by-side for identified clones.
-3. **CI/CD Integration:** Add exit codes and failure thresholds for build pipeline integration.
-4. **Custom Thresholds:** Allow CLI flags to set minimum lines or token count for detection.
-5. **Git Blame Integration:** Show the author and commit date for duplicated code blocks.
+1. [x] **Configurable Ignore Patterns:** Support `.drydockignore` to exclude specific files or directories.
+2. [x] **Code Preview in Dashboard:** View the actual source code side-by-side for identified clones.
+3. [x] **CI/CD Integration:** Add exit codes and failure thresholds for build pipeline integration.
+4. [x] **Custom Thresholds:** Allow CLI flags to set minimum lines or token count for detection.
+5. [x] **Git Blame Integration:** Show the author and commit date for duplicated code blocks.
 6. **Export to Formats:** Support export to HTML (static), CSV, and JUnit XML.
 7. **Historical Analysis:** Track duplication trends over time by comparing reports.
 8. **Clone Diff View:** Visual highlight of differences (if any) in structural clones.

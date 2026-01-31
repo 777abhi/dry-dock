@@ -1,8 +1,11 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as http from 'http';
+import * as url from 'url';
 import fg from 'fast-glob';
 import { scanFile } from './scanner';
+import { getIgnorePatterns } from './utils';
+import { getGitInfo } from './git-utils';
 
 const DASHBOARD_HTML = `<!DOCTYPE html>
 <html lang="en">
@@ -32,6 +35,19 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
             <h2 class="text-2xl font-bold text-red-600">Cross-Project Leakage</h2>
             <div id="leakage-list" class="grid gap-4">
                 <!-- Leakage items will be rendered here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Clone Inspector Modal -->
+    <div id="inspector-modal" class="fixed inset-0 bg-gray-900 bg-opacity-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-6xl h-[80vh] flex flex-col">
+            <div class="p-4 border-b flex justify-between items-center">
+                <h3 class="text-xl font-bold">Clone Inspector</h3>
+                <button onclick="closeInspector()" class="text-gray-500 hover:text-gray-700">&times;</button>
+            </div>
+            <div class="flex-1 overflow-hidden p-4 grid grid-cols-2 gap-4" id="inspector-content">
+                <!-- Code comparison will be injected here -->
             </div>
         </div>
     </div>
@@ -121,17 +137,79 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
                             \${item.lines} lines shared across <span class="text-blue-600">\${item.projects.join(', ')}</span>
                         </div>
                         <div class="text-sm text-gray-600 mt-2">
-                             Found in: \${item.occurrences.map(o => \`<code class="bg-gray-100 px-1 py-0.5 rounded text-xs">\${o.file}</code>\`).join(', ')}
+                             Found in: \${item.occurrences.map(o => {
+                                 const meta = o.author ? \` title="Last modified by \${o.author} on \${o.date}"\` : '';
+                                 return \`<code class="bg-gray-100 px-1 py-0.5 rounded text-xs cursor-help"\${meta}>\${o.file}</code>\`;
+                             }).join(', ')}
                         </div>
                     </div>
                     <div class="text-left md:text-right min-w-[150px]">
                         <div class="text-3xl font-bold text-blue-600">\${Math.round(item.score).toLocaleString()}</div>
                         <div class="text-xs text-gray-400 uppercase tracking-wider font-semibold">RefactorScore</div>
                         <div class="text-xs text-gray-500 mt-1">Spread: \${item.spread} | Freq: \${item.frequency}</div>
+                        <button onclick="inspectClone('\${item.hash}')" class="mt-2 text-sm text-white bg-blue-600 px-3 py-1 rounded hover:bg-blue-700">Inspect Code</button>
                     </div>
                 </div>
             \`).join('');
         }
+
+        let reportData = null;
+
+        async function inspectClone(hash) {
+             const item = reportData.cross_project_leakage.find(i => i.hash === hash) || reportData.internal_duplicates.find(i => i.hash === hash);
+             if (!item) return;
+
+             const modal = document.getElementById('inspector-modal');
+             const content = document.getElementById('inspector-content');
+             modal.classList.remove('hidden');
+             content.innerHTML = '<div class="col-span-2 text-center">Loading code...</div>';
+
+             // Take top 2 occurrences for comparison
+             const [occ1, occ2] = item.occurrences.slice(0, 2);
+
+             try {
+                 const [code1, code2] = await Promise.all([
+                     fetch(\`/api/code?file=\${encodeURIComponent(occ1.file)}\`).then(r => r.text()),
+                     fetch(\`/api/code?file=\${encodeURIComponent(occ2.file)}\`).then(r => r.text())
+                 ]);
+
+                 content.innerHTML = \`
+                    <div class="flex flex-col h-full overflow-hidden border rounded">
+                        <div class="bg-gray-100 p-2 border-b font-mono text-sm font-semibold">\${occ1.file} (\${occ1.project})</div>
+                        <pre class="flex-1 overflow-auto p-4 text-xs bg-gray-50"><code>\${escapeHtml(code1)}</code></pre>
+                    </div>
+                    <div class="flex flex-col h-full overflow-hidden border rounded">
+                        <div class="bg-gray-100 p-2 border-b font-mono text-sm font-semibold">\${occ2.file} (\${occ2.project})</div>
+                        <pre class="flex-1 overflow-auto p-4 text-xs bg-gray-50"><code>\${escapeHtml(code2)}</code></pre>
+                    </div>
+                 \`;
+             } catch (e) {
+                 content.innerHTML = '<div class="col-span-2 text-red-600">Error loading code.</div>';
+             }
+        }
+
+        function closeInspector() {
+            document.getElementById('inspector-modal').classList.add('hidden');
+        }
+
+        function escapeHtml(text) {
+            return text
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        // Hook loadData to save report
+        const originalLoadData = loadData;
+        loadData = async () => {
+             const response = await fetch('/api/data');
+             reportData = await response.json();
+             renderStats(reportData);
+             renderMatrix(reportData);
+             renderLeakage(reportData);
+        };
 
         loadData();
     </script>
@@ -141,6 +219,8 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
 interface Occurrence {
     project: string;
     file: string;
+    author?: string;
+    date?: string;
 }
 
 interface InternalDuplicate {
@@ -170,10 +250,26 @@ interface DryDockReport {
 async function main() {
     const args = process.argv.slice(2);
     const shouldOpen = args.includes('--open');
-    const scanArgs = args.filter(arg => arg !== '--open');
+
+    // Parse --min-lines
+    let minLines = 0;
+    const minLinesIndex = args.indexOf('--min-lines');
+    if (minLinesIndex !== -1 && args[minLinesIndex + 1]) {
+        minLines = parseInt(args[minLinesIndex + 1], 10);
+    }
+
+    const failOnLeaks = args.includes('--fail');
+
+    const scanArgs = args.filter((arg, index) => {
+        if (arg === '--open') return false;
+        if (arg === '--fail') return false;
+        if (arg === '--min-lines') return false;
+        if (index > 0 && args[index - 1] === '--min-lines') return false;
+        return true;
+    });
 
     if (scanArgs.length === 0) {
-        console.error('Usage: drydock <files_or_directories> [--open]');
+        console.error('Usage: drydock <files_or_directories> [--open] [--min-lines <number>] [--fail]');
         process.exit(1);
     }
 
@@ -188,9 +284,18 @@ async function main() {
     });
 
     try {
+        const ignorePatterns = [
+            '**/node_modules/**',
+            '**/.git/**',
+            '**/dist/**',
+            '**/.idea/**',
+            '**/.vscode/**',
+            ...getIgnorePatterns()
+        ];
+
         const files = await fg(patterns, {
             dot: false,
-            ignore: ['**/node_modules/**', '**/.git/**', '**/dist/**', '**/.idea/**', '**/.vscode/**'],
+            ignore: ignorePatterns,
             absolute: true
         });
 
@@ -204,6 +309,8 @@ async function main() {
             try {
                const result = scanFile(file);
                if (result) {
+                   if (result.lines < minLines) continue;
+
                    allProjects.add(result.project);
                    if (!index.has(result.hash)) {
                        index.set(result.hash, { occurrences: [], lines: result.lines });
@@ -226,7 +333,17 @@ async function main() {
             // Only report duplicates
             if (frequency <= 1) continue;
 
-            const projects = Array.from(new Set(data.occurrences.map(o => o.project)));
+            // Enrich occurrences with git info now that we know they are duplicates
+            const enrichedOccurrences = data.occurrences.map(occ => {
+                 const fullPath = path.resolve(process.cwd(), occ.file);
+                 const gitInfo = getGitInfo(fullPath);
+                 return {
+                     ...occ,
+                     ...(gitInfo && { author: gitInfo.author, date: gitInfo.date })
+                 };
+            });
+
+            const projects = Array.from(new Set(enrichedOccurrences.map(o => o.project)));
             const spread = projects.length;
             const lines = data.lines;
             // RefactorScore = P (Spread)^1.5 * F (Frequency) * L (Lines)
@@ -240,7 +357,7 @@ async function main() {
                     spread,
                     score,
                     projects,
-                    occurrences: data.occurrences
+                    occurrences: enrichedOccurrences
                 });
             } else {
                 internal_duplicates.push({
@@ -249,7 +366,7 @@ async function main() {
                     frequency,
                     score,
                     project: projects[0],
-                    occurrences: data.occurrences.map(o => o.file)
+                    occurrences: enrichedOccurrences.map(o => o.file)
                 });
             }
         }
@@ -264,14 +381,57 @@ async function main() {
 
         console.log(`Found ${allProjects.size} project roots`);
 
+        if (failOnLeaks && cross_project_leakage.length > 0) {
+            console.error(`CI Failure: ${cross_project_leakage.length} cross-project leaks detected.`);
+            process.exitCode = 1;
+        }
+
         if (shouldOpen) {
             const server = http.createServer((req, res) => {
-                if (req.url === '/') {
+                const parsedUrl = url.parse(req.url || '', true);
+
+                if (parsedUrl.pathname === '/') {
                     res.writeHead(200, { 'Content-Type': 'text/html' });
                     res.end(DASHBOARD_HTML);
-                } else if (req.url === '/api/data') {
+                } else if (parsedUrl.pathname === '/api/data') {
                     res.writeHead(200, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify(report));
+                } else if (parsedUrl.pathname === '/api/code') {
+                    let fileParam = parsedUrl.query.file;
+                    if (Array.isArray(fileParam)) {
+                        fileParam = fileParam[0];
+                    }
+
+                    if (!fileParam || typeof fileParam !== 'string') {
+                        res.writeHead(400);
+                        res.end('Missing or invalid file parameter');
+                        return;
+                    }
+
+                    const filePath = path.resolve(process.cwd(), fileParam);
+                    const relativePath = path.relative(process.cwd(), filePath);
+
+                    if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
+                        res.writeHead(403);
+                        res.end('Access denied: File outside of project root');
+                        return;
+                    }
+
+                    if (!fs.existsSync(filePath)) {
+                         res.writeHead(404);
+                         res.end('File not found');
+                         return;
+                    }
+
+                    fs.readFile(filePath, 'utf-8', (err, data) => {
+                        if (err) {
+                            res.writeHead(500);
+                            res.end('Error reading file');
+                        } else {
+                            res.writeHead(200, { 'Content-Type': 'text/plain' });
+                            res.end(data);
+                        }
+                    });
                 } else {
                     res.writeHead(404);
                     res.end('Not found');
