@@ -14,3 +14,13 @@ To verify DryDock is correctly identifying cross-project leakage:
    drydock scan ./app-1 ./app-2 --open
    ```
 4. **Validation:** You should see a "Cross-Project" badge in the dashboard with a high RefactorScore, indicating a "Library Candidate."
+
+## Dashboard Results
+
+Here is an example of the DryDock dashboard visualizing the cross-project leakage between two mock applications:
+
+![DryDock Dashboard](drydock-dashboard.png)
+
+The dashboard highlights:
+- A high **RefactorScore** for the duplicated `duplicate()` function.
+- A **Leakage Matrix** showing the connection between `app-1` and `app-2`.
