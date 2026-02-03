@@ -13,6 +13,59 @@ DryDock is a utility for detecting code duplication across repositories.
 - **JSON Reporting:** Outputs detailed analysis to `drydock-report.json`.
 - **Git Blame Integration:** Automatically fetches author and date information for duplicated code blocks if available.
 
+## Running Locally
+
+To run the utility locally, you can use `npm start` or `npx ts-node`.
+
+### Using npm start
+
+The `npm start` command executes `ts-node src/drydock.ts`. You can pass arguments after `--`.
+
+**Scan multiple directories:**
+
+```bash
+npm start -- scan /path/to/project-a /path/to/project-b
+```
+
+**Scan with dashboard (`--open`):**
+
+```bash
+npm start -- scan ./app-1 ./app-2 --open
+```
+
+**Scan with custom failure threshold:**
+
+```bash
+npm start -- scan ./monorepo/packages/* --fail
+```
+
+### Using npx ts-node
+
+Alternatively, you can run the TypeScript file directly:
+
+```bash
+npx ts-node src/drydock.ts scan /path/to/project-a /path/to/project-b
+```
+
+### Path Examples
+
+You can point to different project folder locations using relative or absolute paths:
+
+- **Relative Paths:**
+  ```bash
+  npm start -- scan ./backend ./frontend
+  ```
+
+- **Absolute Paths:**
+  ```bash
+  npm start -- scan /Users/username/projects/service-a /Users/username/projects/service-b
+  ```
+
+- **Glob Patterns (handled by your shell):**
+  ```bash
+  npm start -- scan ../microservices/*
+  ```
+
 ## CLI Options
 
 | Option | Description |
