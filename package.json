@@ -9,7 +9,7 @@
   "scripts": {
     "build": "tsc",
     "start": "ts-node src/drydock.ts",
-    "test": "ts-node tests/test_identifier.ts && ts-node tests/test_scanner.ts && ts-node tests/test_cli.ts"
+    "test": "ts-node tests/test_identifier.ts && ts-node tests/test_scanner.ts && ts-node tests/test_scanner_edge_cases.ts && ts-node tests/test_cli.ts"
   },
   "repository": {
     "type": "git",

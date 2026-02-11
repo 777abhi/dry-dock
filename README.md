@@ -97,6 +97,53 @@ To verify DryDock is correctly identifying cross-project leakage:
    ```
 4. **Validation:** You should see a "Cross-Project" badge in the dashboard with a high RefactorScore, indicating a "Library Candidate."
 
+## Real World Example
+
+To demonstrate DryDock's capabilities in a more realistic scenario, let's consider two microservices: `inventory-service` and `order-service`. Both services are built with Node.js and Express, and they share some common code, such as database connection logic and data models.
+
+1.  **Scenario Setup:**
+    Run `./setup_real_world_example.sh` to generate the mock repositories.
+
+    The script creates:
+    - `inventory-service/src/models/Product.js`: A Mongoose model for products.
+    - `order-service/src/models/Product.js`: Identical model file, duplicated.
+    - `inventory-service/src/utils/db.js`: Database connection utility.
+    - `order-service/src/utils/db.js`: Same logic, but with different comments and whitespace.
+
+2.  **Running the Scan:**
+    ```bash
+    drydock scan mock-repos/inventory-service mock-repos/order-service --formats json
+    ```
+
+3.  **Outcome:**
+    DryDock successfully identifies both the exact match (`Product.js`) and the structural match (`db.js`), ignoring the differences in comments.
+
+    *Snippet from `drydock-report.json`:*
+    ```json
+    {
+      "cross_project_leakage": [
+        {
+          "lines": 32,
+          "score": 181.01,
+          "projects": ["inventory-service", "order-service"],
+          "occurrences": [
+            { "file": "mock-repos/inventory-service/src/models/Product.js" },
+            { "file": "mock-repos/order-service/src/models/Product.js" }
+          ]
+        },
+        {
+          "lines": 19,
+          "score": 107.48,
+          "projects": ["inventory-service", "order-service"],
+          "occurrences": [
+            { "file": "mock-repos/inventory-service/src/utils/db.js" },
+            { "file": "mock-repos/order-service/src/utils/db.js" }
+          ]
+        }
+      ]
+    }
+    ```
+
 ## Dashboard Results
 
 Here is an example of the DryDock dashboard visualizing the cross-project leakage between two mock applications:

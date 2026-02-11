@@ -41,10 +41,16 @@ export function scanFile(filePath: string): ScanResult | null {
         // Mask identifiers to detect structural clones
         // 'default' and 'function' are common types for identifiers and function names in @jscpd/tokenizer
         if (['default', 'function'].includes(token.type)) {
+            // Skip empty tokens that are misclassified as default
+            if (!token.value) continue;
             normalized += '__ID__';
         } else {
             normalized += token.value;
         }
+    }
+
+    if (normalized.length === 0) {
+        return null;
     }
 
     const hash = crypto.createHash('sha256').update(normalized).digest('hex');
