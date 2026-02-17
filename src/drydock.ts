@@ -24,20 +24,40 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
             <div id="stats" class="text-gray-600"></div>
         </header>
 
-        <!-- Leakage Matrix -->
-        <div class="bg-white rounded-lg shadow p-6 overflow-x-auto">
-            <h2 class="text-xl font-bold mb-4 text-gray-800">Project Leakage Matrix</h2>
-            <div id="matrix-container">
-                <!-- Matrix will be rendered here -->
+         <!-- Setup / New Scan Section -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <h2 class="text-xl font-bold mb-4 text-gray-800">New Scan</h2>
+            <div class="flex gap-4 items-end">
+                <div class="flex-1">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Repository Paths (comma separated)</label>
+                    <input type="text" id="repo-paths" class="w-full border rounded px-3 py-2" placeholder="/path/to/repo1, /path/to/repo2">
+                </div>
+                <button onclick="browseFolder()" class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded">Browse...</button>
+                <button onclick="triggerScan()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded font-bold">Scan Now</button>
             </div>
+            <div id="scan-status" class="mt-2 text-sm text-gray-600"></div>
         </div>
 
-        <!-- Cross-Project Leakage List -->
-        <div class="space-y-6">
-            <h2 class="text-2xl font-bold text-red-600">Cross-Project Leakage</h2>
-            <div id="leakage-list" class="grid gap-4">
-                <!-- Leakage items will be rendered here -->
+        <div id="results-container" class="space-y-8 hidden">
+             <!-- Leakage Matrix -->
+            <div class="bg-white rounded-lg shadow p-6 overflow-x-auto">
+                <h2 class="text-xl font-bold mb-4 text-gray-800">Project Leakage Matrix</h2>
+                <div id="matrix-container">
+                    <!-- Matrix will be rendered here -->
+                </div>
             </div>
+
+            <!-- Cross-Project Leakage List -->
+            <div class="space-y-6">
+                <h2 class="text-2xl font-bold text-red-600">Cross-Project Leakage</h2>
+                <div id="leakage-list" class="grid gap-4">
+                    <!-- Leakage items will be rendered here -->
+                </div>
+            </div>
+        </div>
+        
+        <div id="empty-state" class="text-center py-12 text-gray-500">
+            No scan results yet. Add paths above and click "Scan Now" to begin.
         </div>
     </div>
 
@@ -55,17 +75,70 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
     </div>
 
     <script>
+        async function browseFolder() {
+             try {
+                 const response = await fetch('/api/browse');
+                 if (response.ok) {
+                     const path = await response.text();
+                     if (path) {
+                         const current = document.getElementById('repo-paths').value;
+                         document.getElementById('repo-paths').value = current ? current + ', ' + path : path;
+                     }
+                 }
+             } catch (e) {
+                 console.error('Browse failed', e);
+             }
+        }
+
+        async function triggerScan() {
+            const paths = document.getElementById('repo-paths').value.split(',').map(p => p.trim()).filter(p => p);
+            if (paths.length === 0) {
+                alert('Please enter at least one path');
+                return;
+            }
+
+            document.getElementById('scan-status').innerText = 'Scanning...';
+            
+            try {
+                const response = await fetch('/api/scan', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ paths })
+                });
+                
+                if (response.ok) {
+                    const report = await response.json();
+                    renderReport(report);
+                    document.getElementById('scan-status').innerText = 'Scan complete!';
+                } else {
+                     document.getElementById('scan-status').innerText = 'Scan failed.';
+                }
+            } catch (e) {
+                console.error(e);
+                document.getElementById('scan-status').innerText = 'Error triggering scan.';
+            }
+        }
+
         async function loadData() {
             try {
                 const response = await fetch('/api/data');
                 const report = await response.json();
-                renderStats(report);
-                renderMatrix(report);
-                renderLeakage(report);
+                if (report && (report.cross_project_leakage.length > 0 || report.internal_duplicates.length > 0)) {
+                   renderReport(report);
+                }
             } catch (error) {
-                console.error('Error loading data:', error);
-                document.body.innerHTML = '<div class="text-red-600 text-center p-8">Error loading report data. Ensure server is running.</div>';
+                console.log('No existing report data found.');
             }
+        }
+
+        function renderReport(report) {
+            reportData = report;
+            document.getElementById('results-container').classList.remove('hidden');
+            document.getElementById('empty-state').classList.add('hidden');
+            
+            renderStats(report);
+            renderMatrix(report);
+            renderLeakage(report);
         }
 
         function renderStats(report) {
@@ -218,233 +291,287 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
 </body>
 </html>`;
 
-async function main() {
-    const args = process.argv.slice(2);
-    const shouldOpen = args.includes('--open');
+// ... imports
+import { exec } from 'child_process';
 
-    // Parse --min-lines
-    let minLines = 0;
-    const minLinesIndex = args.indexOf('--min-lines');
-    if (minLinesIndex !== -1 && args[minLinesIndex + 1]) {
-        minLines = parseInt(args[minLinesIndex + 1], 10);
-    }
+interface ScanOptions {
+    minLines: number;
+    ignorePatterns: string[];
+}
 
-    const failOnLeaks = args.includes('--fail');
-
-    // Parse --formats
-    let formats = ['json'];
-    const formatsIndex = args.indexOf('--formats');
-    if (formatsIndex !== -1 && args[formatsIndex + 1]) {
-        formats = args[formatsIndex + 1].split(',').map(f => f.trim().toLowerCase());
-    }
-
-    const scanArgs = args.filter((arg, index) => {
-        if (arg === '--open') return false;
-        if (arg === '--fail') return false;
-        if (arg === '--min-lines') return false;
-        if (index > 0 && args[index - 1] === '--min-lines') return false;
-        if (arg === '--formats') return false;
-        if (index > 0 && args[index - 1] === '--formats') return false;
-        return true;
-    });
-
-    if (scanArgs.length === 0) {
-        console.error('Usage: drydock <files_or_directories> [--open] [--min-lines <number>] [--fail] [--formats <json,html,csv,junit>]');
-        process.exit(1);
-    }
-
+async function executeScan(paths: string[], options: ScanOptions): Promise<DryDockReport> {
     const entries: string[] = [];
 
     // Expand directories to globs
-    const patterns = scanArgs.map(arg => {
+    const patterns = paths.map(arg => {
         if (fs.existsSync(arg) && fs.statSync(arg).isDirectory()) {
             return path.join(arg, '**', '*');
         }
         return arg;
     });
 
-    try {
-        const ignorePatterns = [
-            '**/node_modules/**',
-            '**/.git/**',
-            '**/dist/**',
-            '**/.idea/**',
-            '**/.vscode/**',
-            ...getIgnorePatterns()
-        ];
+    const ignorePatterns = [
+        '**/node_modules/**',
+        '**/.git/**',
+        '**/dist/**',
+        '**/build/**',
+        '**/out/**',
+        '**/client-build/**',
+        '**/server-build/**',
+        '**/.idea/**',
+        '**/.vscode/**',
+        '**/*.png',
+        '**/*.jpg',
+        '**/*.jpeg',
+        '**/*.gif',
+        '**/*.svg',
+        '**/*.ico',
+        ...options.ignorePatterns
+    ];
 
-        const files = await fg(patterns, {
-            dot: false,
-            ignore: ignorePatterns,
-            absolute: true
+    console.log(`Starting file search in ${patterns.join(', ')}...`);
+    const searchStart = Date.now();
+    const files = await fg(patterns, {
+        dot: false,
+        ignore: ignorePatterns,
+        absolute: true
+    });
+    console.log(`Found ${files.length} files in ${(Date.now() - searchStart) / 1000}s`);
+
+    const index = new Map<string, { occurrences: Occurrence[], lines: number }>();
+    const allProjects = new Set<string>();
+
+    let processed = 0;
+    for (const file of files) {
+        // Only scan files
+        if (!fs.statSync(file).isFile()) continue;
+
+        processed++;
+        if (processed % 100 === 0) {
+            console.log(`Scanned ${processed}/${files.length} files...`);
+        }
+
+        try {
+            const result = scanFile(file);
+            if (result) {
+                if (result.lines < options.minLines) continue;
+
+                allProjects.add(result.project);
+                if (!index.has(result.hash)) {
+                    index.set(result.hash, { occurrences: [], lines: result.lines });
+                }
+                index.get(result.hash)!.occurrences.push({
+                    project: result.project,
+                    file: path.relative(process.cwd(), file)
+                });
+            }
+        } catch (err) {
+            console.warn(`Error scanning ${file}:`, err);
+        }
+    }
+
+    const internal_duplicates: InternalDuplicate[] = [];
+    const cross_project_leakage: CrossProjectLeakage[] = [];
+
+    for (const [hash, data] of index.entries()) {
+        const frequency = data.occurrences.length;
+        // Only report duplicates
+        if (frequency <= 1) continue;
+
+        // Enrich occurrences with git info now that we know they are duplicates
+        const enrichedOccurrences = data.occurrences.map(occ => {
+            const fullPath = path.resolve(process.cwd(), occ.file);
+            const gitInfo = getGitInfo(fullPath);
+            return {
+                ...occ,
+                ...(gitInfo && { author: gitInfo.author, date: gitInfo.date })
+            };
         });
 
-        const index = new Map<string, { occurrences: Occurrence[], lines: number }>();
-        const allProjects = new Set<string>();
+        const projects = Array.from(new Set(enrichedOccurrences.map(o => o.project)));
+        const spread = projects.length;
+        const lines = data.lines;
+        // RefactorScore = P (Spread)^1.5 * F (Frequency) * L (Lines)
+        const score = Math.pow(spread, 1.5) * frequency * lines;
 
-        for (const file of files) {
-            // Only scan files
-            if (!fs.statSync(file).isFile()) continue;
-
-            try {
-                const result = scanFile(file);
-                if (result) {
-                    if (result.lines < minLines) continue;
-
-                    allProjects.add(result.project);
-                    if (!index.has(result.hash)) {
-                        index.set(result.hash, { occurrences: [], lines: result.lines });
-                    }
-                    index.get(result.hash)!.occurrences.push({
-                        project: result.project,
-                        file: path.relative(process.cwd(), file)
-                    });
-                }
-            } catch (err) {
-                console.warn(`Error scanning ${file}:`, err);
-            }
-        }
-
-        const internal_duplicates: InternalDuplicate[] = [];
-        const cross_project_leakage: CrossProjectLeakage[] = [];
-
-        for (const [hash, data] of index.entries()) {
-            const frequency = data.occurrences.length;
-            // Only report duplicates
-            if (frequency <= 1) continue;
-
-            // Enrich occurrences with git info now that we know they are duplicates
-            const enrichedOccurrences = data.occurrences.map(occ => {
-                const fullPath = path.resolve(process.cwd(), occ.file);
-                const gitInfo = getGitInfo(fullPath);
-                return {
-                    ...occ,
-                    ...(gitInfo && { author: gitInfo.author, date: gitInfo.date })
-                };
+        if (spread > 1) {
+            cross_project_leakage.push({
+                hash,
+                lines,
+                frequency,
+                spread,
+                score,
+                projects,
+                occurrences: enrichedOccurrences
             });
+        } else {
+            internal_duplicates.push({
+                hash,
+                lines,
+                frequency,
+                score,
+                project: projects[0],
+                occurrences: enrichedOccurrences.map(o => o.file)
+            });
+        }
+    }
 
-            const projects = Array.from(new Set(enrichedOccurrences.map(o => o.project)));
-            const spread = projects.length;
-            const lines = data.lines;
-            // RefactorScore = P (Spread)^1.5 * F (Frequency) * L (Lines)
-            const score = Math.pow(spread, 1.5) * frequency * lines;
+    return {
+        internal_duplicates: internal_duplicates.sort((a, b) => b.score - a.score),
+        cross_project_leakage: cross_project_leakage.sort((a, b) => b.score - a.score)
+    };
+}
 
-            if (spread > 1) {
-                cross_project_leakage.push({
-                    hash,
-                    lines,
-                    frequency,
-                    spread,
-                    score,
-                    projects,
-                    occurrences: enrichedOccurrences
-                });
-            } else {
-                internal_duplicates.push({
-                    hash,
-                    lines,
-                    frequency,
-                    score,
-                    project: projects[0],
-                    occurrences: enrichedOccurrences.map(o => o.file)
-                });
+let currentReport: DryDockReport | null = null;
+let currentCliOptions: ScanOptions = { minLines: 0, ignorePatterns: [] };
+
+async function main() {
+    const args = process.argv.slice(2);
+
+    // Parse args
+    let minLines = 0;
+    const minLinesIndex = args.indexOf('--min-lines');
+    if (minLinesIndex !== -1 && args[minLinesIndex + 1]) {
+        minLines = parseInt(args[minLinesIndex + 1], 10);
+    }
+
+    // Parse ignore options from cli if any (hacky, ideally use commander or similar)
+    const ignoreIndex = args.indexOf('--ignore');
+    let cliIgnore: string[] = [];
+    if (ignoreIndex !== -1 && args[ignoreIndex + 1]) {
+        cliIgnore = [args[ignoreIndex + 1]];
+    }
+
+    const failOnLeaks = args.includes('--fail');
+    const shouldOpen = args.includes('--open') || args.length === 0;
+
+    // Collect paths to scan
+    const scanArgs = args.filter((arg, index) => {
+        if (arg.startsWith('--')) return false;
+        if (index > 0 && args[index - 1].startsWith('--')) return false;
+        return true;
+    });
+
+    currentCliOptions = {
+        minLines,
+        ignorePatterns: [...getIgnorePatterns(), ...cliIgnore]
+    };
+
+    // If paths provided, run immediate scan
+    if (scanArgs.length > 0) {
+        console.log('Scanning paths:', scanArgs);
+        try {
+            currentReport = await executeScan(scanArgs, currentCliOptions);
+
+            // Save reports based on formats (simplified for now to JSON default)
+            // In a real refactor, format handling should be robust
+            fs.writeFileSync('drydock-report.json', JSON.stringify(currentReport, null, 2));
+
+            const crossCount = currentReport.cross_project_leakage.length;
+            if (failOnLeaks && crossCount > 0) {
+                console.error(`CI Failure: ${crossCount} cross-project leaks detected.`);
+                process.exitCode = 1;
             }
+        } catch (e) {
+            console.error('Scan failed:', e);
+            process.exit(1);
         }
+    } else {
+        console.log('No paths provided. Launching in interactive mode.');
+    }
 
-        const report: DryDockReport = {
-            internal_duplicates: internal_duplicates.sort((a, b) => b.score - a.score),
-            cross_project_leakage: cross_project_leakage.sort((a, b) => b.score - a.score)
-        };
+    if (shouldOpen || scanArgs.length === 0) {
+        const server = http.createServer(async (req, res) => {
+            const parsedUrl = new URL(req.url || '', 'http://localhost:3000');
 
-        // Save reports based on formats
-        if (formats.includes('json')) {
-            fs.writeFileSync('drydock-report.json', JSON.stringify(report, null, 2));
-        }
-
-        if (formats.includes('csv')) {
-            fs.writeFileSync('drydock-report.csv', exportToCSV(report));
-        }
-
-        if (formats.includes('junit')) {
-            fs.writeFileSync('drydock-report.xml', exportToJUnit(report));
-        }
-
-        if (formats.includes('html')) {
-            fs.writeFileSync('drydock-report.html', exportToHTML(report, DASHBOARD_HTML));
-        }
-
-        console.log(`Found ${allProjects.size} project roots`);
-
-        if (failOnLeaks && cross_project_leakage.length > 0) {
-            console.error(`CI Failure: ${cross_project_leakage.length} cross-project leaks detected.`);
-            process.exitCode = 1;
-        }
-
-        if (shouldOpen) {
-            const server = http.createServer((req, res) => {
-                const parsedUrl = url.parse(req.url || '', true);
-
-                if (parsedUrl.pathname === '/') {
-                    res.writeHead(200, { 'Content-Type': 'text/html' });
-                    res.end(DASHBOARD_HTML);
-                } else if (parsedUrl.pathname === '/api/data') {
-                    res.writeHead(200, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify(report));
-                } else if (parsedUrl.pathname === '/api/code') {
-                    let fileParam = parsedUrl.query.file;
-                    if (Array.isArray(fileParam)) {
-                        fileParam = fileParam[0];
+            if (parsedUrl.pathname === '/') {
+                res.writeHead(200, { 'Content-Type': 'text/html' });
+                res.end(DASHBOARD_HTML);
+            } else if (parsedUrl.pathname === '/api/data') {
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify(currentReport || { internal_duplicates: [], cross_project_leakage: [] }));
+            } else if (parsedUrl.pathname === '/api/scan' && req.method === 'POST') {
+                let body = '';
+                req.on('data', chunk => body += chunk);
+                req.on('end', async () => {
+                    try {
+                        const { paths } = JSON.parse(body);
+                        if (paths && Array.isArray(paths)) {
+                            console.log('Triggering scan for:', paths);
+                            currentReport = await executeScan(paths, currentCliOptions);
+                            res.writeHead(200, { 'Content-Type': 'application/json' });
+                            res.end(JSON.stringify(currentReport));
+                        } else {
+                            res.writeHead(400);
+                            res.end('Invalid paths');
+                        }
+                    } catch (e) {
+                        res.writeHead(500);
+                        res.end('Scan error');
                     }
-
-                    if (!fileParam || typeof fileParam !== 'string') {
-                        res.writeHead(400);
-                        res.end('Missing or invalid file parameter');
-                        return;
-                    }
-
-                    const filePath = path.resolve(process.cwd(), fileParam);
-                    const relativePath = path.relative(process.cwd(), filePath);
-
-                    if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
-                        res.writeHead(403);
-                        res.end('Access denied: File outside of project root');
-                        return;
-                    }
-
-                    if (!fs.existsSync(filePath)) {
-                        res.writeHead(404);
-                        res.end('File not found');
-                        return;
-                    }
-
-                    fs.readFile(filePath, 'utf-8', (err, data) => {
+                });
+            } else if (parsedUrl.pathname === '/api/browse') {
+                // macOS specific folder picker
+                if (process.platform === 'darwin') {
+                    exec(`osascript -e 'Tell application "System Events" to display dialog "Select a repository folder" default answer "" with icon note buttons {"Cancel", "Choose"} default button "Choose"' -e 'set the item_path to POSIX path of (choose folder with prompt "Select a repository folder")' -e 'return item_path'`, (err, stdout) => {
                         if (err) {
                             res.writeHead(500);
-                            res.end('Error reading file');
+                            res.end('');
                         } else {
                             res.writeHead(200, { 'Content-Type': 'text/plain' });
-                            res.end(data);
+                            res.end(stdout.trim());
                         }
                     });
                 } else {
-                    res.writeHead(404);
-                    res.end('Not found');
+                    res.writeHead(501);
+                    res.end('Not supported on this OS');
                 }
-            });
+            } else if (parsedUrl.pathname === '/api/code') {
+                let fileParam = parsedUrl.searchParams.get('file');
 
-            server.listen(3000, () => {
-                console.log('Dashboard successfully launched at http://localhost:3000');
-            });
+                if (!fileParam || typeof fileParam !== 'string') {
+                    res.writeHead(400);
+                    res.end('Missing or invalid file parameter');
+                    return;
+                }
 
-            // Keep process alive
-            await new Promise(() => { });
-        } else {
-            console.log('Dashboard successfully launched at localhost:3000 (Run with --open to view)');
-        }
+                const filePath = path.resolve(process.cwd(), fileParam);
+                const relativePath = path.relative(process.cwd(), filePath);
 
-    } catch (e) {
-        console.error(e);
-        process.exit(1);
+                // Security check: prevent directory traversal
+                if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
+                    res.writeHead(403);
+                    res.end('Access denied: File outside of project root');
+                    return;
+                }
+
+                if (!fs.existsSync(filePath)) {
+                    res.writeHead(404);
+                    res.end('File not found');
+                    return;
+                }
+
+                fs.readFile(filePath, 'utf-8', (err, data) => {
+                    if (err) {
+                        res.writeHead(500);
+                        res.end('Error reading file');
+                    } else {
+                        res.writeHead(200, { 'Content-Type': 'text/plain' });
+                        res.end(data);
+                    }
+                });
+            } else {
+                res.writeHead(404);
+                res.end('Not found');
+            }
+        });
+
+        server.listen(3000, () => {
+            console.log('Dashboard successfully launched at http://localhost:3000');
+        });
+
+        // Keep process alive
+        await new Promise(() => { });
     }
 }
 

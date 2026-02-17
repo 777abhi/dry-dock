@@ -11,8 +11,23 @@ export interface ScanResult {
 }
 
 export function scanFile(filePath: string): ScanResult | null {
+    const MAX_FILE_SIZE = 500 * 1024; // 500KB
+    const stats = fs.statSync(filePath);
+    if (stats.size > MAX_FILE_SIZE) {
+        console.warn(`Skipping ${filePath}: File too large (${(stats.size / 1024).toFixed(2)}KB)`);
+        return null;
+    }
+
     const content = fs.readFileSync(filePath, 'utf-8');
     const lines = content.split(/\r?\n/).length;
+
+    // Check for minified files (long lines)
+    const MAX_LINE_LENGTH = 2000;
+    const linesArr = content.split(/\r?\n/);
+    if (linesArr.some(line => line.length > MAX_LINE_LENGTH)) {
+        console.warn(`Skipping ${filePath}: Minified content detected (line > ${MAX_LINE_LENGTH})`);
+        return null;
+    }
 
     // Default to 'unknown' format if detection fails, though jscpd usually handles extensions well.
     // If format is unknown, jscpd might not tokenize correctly.
