@@ -33,8 +33,9 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Repository Paths (comma separated)</label>
                     <input type="text" id="repo-paths" class="w-full border rounded px-3 py-2" placeholder="/path/to/repo1, /path/to/repo2">
                 </div>
-                <button onclick="browseFolder()" class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded">Browse...</button>
-                <button onclick="triggerScan()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded font-bold">Scan Now</button>
+                <button id="browse-btn" onclick="browseFolder()" class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded">Browse...</button>
+                <button id="scan-btn" onclick="triggerScan()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded font-bold">Scan Now</button>
+                <button id="cancel-btn" onclick="cancelScan()" class="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded font-bold hidden">Cancel</button>
             </div>
             <div id="scan-status" class="mt-2 text-sm text-gray-600"></div>
         </div>
@@ -99,6 +100,8 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
             }
 
             document.getElementById('scan-status').innerText = 'Scanning...';
+            document.getElementById('scan-btn').classList.add('hidden');
+            document.getElementById('cancel-btn').classList.remove('hidden');
             
             try {
                 const response = await fetch('/api/scan', {
@@ -112,12 +115,25 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
                     renderReport(report);
                     document.getElementById('scan-status').innerText = 'Scan complete!';
                 } else {
-                     document.getElementById('scan-status').innerText = 'Scan failed.';
+                     const err = await response.json();
+                     if (err.error === 'Scan cancelled') {
+                        document.getElementById('scan-status').innerText = 'Scan cancelled.';
+                     } else {
+                        document.getElementById('scan-status').innerText = 'Scan failed.';
+                     }
                 }
             } catch (e) {
                 console.error(e);
                 document.getElementById('scan-status').innerText = 'Error triggering scan.';
+            } finally {
+                document.getElementById('scan-btn').classList.remove('hidden');
+                document.getElementById('cancel-btn').classList.add('hidden');
             }
+        }
+
+        async function cancelScan() {
+             document.getElementById('scan-status').innerText = 'Cancelling...';
+             await fetch('/api/cancel', { method: 'POST' });
         }
 
         async function loadData() {
@@ -300,7 +316,11 @@ interface ScanOptions {
     ignorePatterns: string[];
 }
 
+// Global cancellation state
+let shouldCancel = false;
+
 async function executeScan(paths: string[], options: ScanOptions): Promise<DryDockReport> {
+    shouldCancel = false; // Reset cancel flag at start
     const entries: string[] = [];
 
     // Expand directories to globs
@@ -344,6 +364,11 @@ async function executeScan(paths: string[], options: ScanOptions): Promise<DryDo
 
     let processed = 0;
     for (const file of files) {
+        if (shouldCancel) {
+            console.log('Scan cancelled by user.');
+            throw new Error('Scan cancelled');
+        }
+
         // Only scan files
         if (!fs.statSync(file).isFile()) continue;
 
@@ -507,12 +532,21 @@ async function main() {
                             res.writeHead(400);
                             res.end('Invalid paths');
                         }
-                    } catch (e) {
-                        console.error('Scan API error:', e);
-                        res.writeHead(500);
-                        res.end('Scan error');
+                    } catch (e: any) {
+                        if (e.message === 'Scan cancelled') {
+                            res.writeHead(400);
+                            res.end(JSON.stringify({ error: 'Scan cancelled' }));
+                        } else {
+                            console.error('Scan API error:', e);
+                            res.writeHead(500);
+                            res.end('Scan error');
+                        }
                     }
                 });
+            } else if (parsedUrl.pathname === '/api/cancel' && req.method === 'POST') {
+                shouldCancel = true;
+                res.writeHead(200);
+                res.end('Cancellation requested');
             } else if (parsedUrl.pathname === '/api/browse') {
                 // macOS specific folder picker
                 if (process.platform === 'darwin') {
