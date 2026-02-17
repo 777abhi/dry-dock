@@ -483,6 +483,7 @@ async function main() {
 
     if (shouldOpen || scanArgs.length === 0) {
         const server = http.createServer(async (req, res) => {
+            // ... (keep existing request handling) ...
             const parsedUrl = new URL(req.url || '', 'http://localhost:3000');
 
             if (parsedUrl.pathname === '/') {
@@ -507,6 +508,7 @@ async function main() {
                             res.end('Invalid paths');
                         }
                     } catch (e) {
+                        console.error('Scan API error:', e);
                         res.writeHead(500);
                         res.end('Scan error');
                     }
@@ -567,9 +569,35 @@ async function main() {
             }
         });
 
+        server.on('error', (e: any) => {
+            if (e.code === 'EADDRINUSE') {
+                console.error('Error: Port 3000 is already in use.');
+                console.error('Please stop the existing process running on port 3000 or use a different port.');
+                process.exit(1);
+            } else {
+                console.error('Server error:', e);
+                throw e;
+            }
+        });
+
         server.listen(3000, () => {
             console.log('Dashboard successfully launched at http://localhost:3000');
+            console.log('Press Ctrl+C to stop the server.');
         });
+
+        // Handle graceful shutdown
+        const shutdown = () => {
+            console.log('\nShutting down server...');
+            server.close(() => {
+                console.log('Server stopped.');
+                process.exit(0);
+            });
+            // Force exit if server hasn't closed in 1s
+            setTimeout(() => process.exit(0), 1000);
+        };
+
+        process.on('SIGINT', shutdown);
+        process.on('SIGTERM', shutdown);
 
         // Keep process alive
         await new Promise(() => { });
