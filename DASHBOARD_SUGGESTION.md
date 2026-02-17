@@ -1,6 +1,6 @@
-# DryDock Dashboard UI Suggestion
+# dry-dock Dashboard UI Suggestion
 
-This document outlines a suggested React/Tailwind structure for the DryDock dashboard.
+This document outlines a suggested React/Tailwind structure for the dry-dock dashboard.
 
 ## Component Architecture
 

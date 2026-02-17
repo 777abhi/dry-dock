@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "DryDock Report Schema",
+  "title": "dry-dock Report Schema",
   "type": "object",
   "properties": {
     "internal_duplicates": {
@@ -8,17 +8,36 @@
       "items": {
         "type": "object",
         "properties": {
-          "hash": { "type": "string" },
-          "lines": { "type": "integer" },
-          "frequency": { "type": "integer" },
-          "score": { "type": "number" },
-          "project": { "type": "string" },
+          "hash": {
+            "type": "string"
+          },
+          "lines": {
+            "type": "integer"
+          },
+          "frequency": {
+            "type": "integer"
+          },
+          "score": {
+            "type": "number"
+          },
+          "project": {
+            "type": "string"
+          },
           "occurrences": {
             "type": "array",
-            "items": { "type": "string" }
+            "items": {
+              "type": "string"
+            }
           }
         },
-        "required": ["hash", "lines", "frequency", "score", "project", "occurrences"]
+        "required": [
+          "hash",
+          "lines",
+          "frequency",
+          "score",
+          "project",
+          "occurrences"
+        ]
       }
     },
     "cross_project_leakage": {
@@ -26,30 +45,60 @@
       "items": {
         "type": "object",
         "properties": {
-          "hash": { "type": "string" },
-          "lines": { "type": "integer" },
-          "frequency": { "type": "integer" },
-          "spread": { "type": "integer" },
-          "score": { "type": "number" },
+          "hash": {
+            "type": "string"
+          },
+          "lines": {
+            "type": "integer"
+          },
+          "frequency": {
+            "type": "integer"
+          },
+          "spread": {
+            "type": "integer"
+          },
+          "score": {
+            "type": "number"
+          },
           "projects": {
             "type": "array",
-            "items": { "type": "string" }
+            "items": {
+              "type": "string"
+            }
           },
           "occurrences": {
             "type": "array",
             "items": {
               "type": "object",
               "properties": {
-                "project": { "type": "string" },
-                "file": { "type": "string" }
+                "project": {
+                  "type": "string"
+                },
+                "file": {
+                  "type": "string"
+                }
               },
-              "required": ["project", "file"]
+              "required": [
+                "project",
+                "file"
+              ]
             }
           }
         },
-        "required": ["hash", "lines", "frequency", "spread", "score", "projects", "occurrences"]
+        "required": [
+          "hash",
+          "lines",
+          "frequency",
+          "spread",
+          "score",
+          "projects",
+          "occurrences"
+        ]
       }
     }
   },
-  "required": ["internal_duplicates", "cross_project_leakage"]
+  "required": [
+    "internal_duplicates",
+    "cross_project_leakage"
+  ]
 }

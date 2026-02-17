@@ -1,6 +1,6 @@
-# DryDock
+# dry-dock
 
-DryDock is a utility for detecting code duplication across repositories.
+dry-dock is a utility for detecting code duplication across repositories.
 
 ## Features
 
@@ -86,7 +86,7 @@ src/generated/**
 
 ## Verifying the Installation
 
-To verify DryDock is correctly identifying cross-project leakage:
+To verify dry-dock is correctly identifying cross-project leakage:
 
 1. **Create a test folder:** `mkdir test-drydock && cd test-drydock`
 2. **Setup mock projects:** - Create `app-1/main.js` and `app-2/main.js`.
@@ -99,7 +99,7 @@ To verify DryDock is correctly identifying cross-project leakage:
 
 ## Real World Example
 
-To demonstrate DryDock's capabilities in a more realistic scenario, let's consider two microservices: `inventory-service` and `order-service`. Both services are built with Node.js and Express, and they share some common code, such as database connection logic and data models.
+To demonstrate dry-dock's capabilities in a more realistic scenario, let's consider two microservices: `inventory-service` and `order-service`. Both services are built with Node.js and Express, and they share some common code, such as database connection logic and data models.
 
 1.  **Scenario Setup:**
     Run `./setup_real_world_example.sh` to generate the mock repositories.
@@ -116,7 +116,7 @@ To demonstrate DryDock's capabilities in a more realistic scenario, let's consid
     ```
 
 3.  **Outcome:**
-    DryDock successfully identifies both the exact match (`Product.js`) and the structural match (`db.js`), ignoring the differences in comments.
+    dry-dock successfully identifies both the exact match (`Product.js`) and the structural match (`db.js`), ignoring the differences in comments.
 
     *Snippet from `drydock-report.json`:*
     ```json
@@ -146,9 +146,9 @@ To demonstrate DryDock's capabilities in a more realistic scenario, let's consid
 
 ## Dashboard Results
 
-Here is an example of the DryDock dashboard visualizing the cross-project leakage between two mock applications:
+Here is an example of the dry-dock dashboard visualizing the cross-project leakage between two mock applications:
 
-![DryDock Dashboard](drydock-dashboard.png)
+![dry-dock Dashboard](drydock-dashboard.png)
 
 The dashboard highlights:
 - A high **RefactorScore** for the duplicated `duplicate()` function.
@@ -158,7 +158,7 @@ The dashboard highlights:
 
 You can now inspect the duplicated code directly in the dashboard by clicking the "Inspect Code" button on any leakage item. This opens a side-by-side comparison of the normalized code occurrences.
 
-![DryDock Clone Inspector](drydock-inspector.png)
+![dry-dock Clone Inspector](drydock-inspector.png)
 
 ## Roadmap: Next 20 Features
 

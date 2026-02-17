@@ -14,13 +14,13 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DryDock Dashboard</title>
+    <title>dry-dock Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-100 p-8">
     <div class="max-w-7xl mx-auto space-y-8">
         <header class="flex justify-between items-center">
-            <h1 class="text-3xl font-bold text-gray-800">DryDock Dashboard</h1>
+            <h1 class="text-3xl font-bold text-gray-800">dry-dock Dashboard</h1>
             <div id="stats" class="text-gray-600"></div>
         </header>
 
@@ -287,19 +287,19 @@ async function main() {
             if (!fs.statSync(file).isFile()) continue;
 
             try {
-               const result = scanFile(file);
-               if (result) {
-                   if (result.lines < minLines) continue;
+                const result = scanFile(file);
+                if (result) {
+                    if (result.lines < minLines) continue;
 
-                   allProjects.add(result.project);
-                   if (!index.has(result.hash)) {
-                       index.set(result.hash, { occurrences: [], lines: result.lines });
-                   }
-                   index.get(result.hash)!.occurrences.push({
-                       project: result.project,
-                       file: path.relative(process.cwd(), file)
-                   });
-               }
+                    allProjects.add(result.project);
+                    if (!index.has(result.hash)) {
+                        index.set(result.hash, { occurrences: [], lines: result.lines });
+                    }
+                    index.get(result.hash)!.occurrences.push({
+                        project: result.project,
+                        file: path.relative(process.cwd(), file)
+                    });
+                }
             } catch (err) {
                 console.warn(`Error scanning ${file}:`, err);
             }
@@ -315,12 +315,12 @@ async function main() {
 
             // Enrich occurrences with git info now that we know they are duplicates
             const enrichedOccurrences = data.occurrences.map(occ => {
-                 const fullPath = path.resolve(process.cwd(), occ.file);
-                 const gitInfo = getGitInfo(fullPath);
-                 return {
-                     ...occ,
-                     ...(gitInfo && { author: gitInfo.author, date: gitInfo.date })
-                 };
+                const fullPath = path.resolve(process.cwd(), occ.file);
+                const gitInfo = getGitInfo(fullPath);
+                return {
+                    ...occ,
+                    ...(gitInfo && { author: gitInfo.author, date: gitInfo.date })
+                };
             });
 
             const projects = Array.from(new Set(enrichedOccurrences.map(o => o.project)));
@@ -412,9 +412,9 @@ async function main() {
                     }
 
                     if (!fs.existsSync(filePath)) {
-                         res.writeHead(404);
-                         res.end('File not found');
-                         return;
+                        res.writeHead(404);
+                        res.end('File not found');
+                        return;
                     }
 
                     fs.readFile(filePath, 'utf-8', (err, data) => {
@@ -437,7 +437,7 @@ async function main() {
             });
 
             // Keep process alive
-            await new Promise(() => {});
+            await new Promise(() => { });
         } else {
             console.log('Dashboard successfully launched at localhost:3000 (Run with --open to view)');
         }

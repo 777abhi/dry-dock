@@ -1,5 +1,5 @@
 {
-  "name": "app",
+  "name": "dry-dock",
   "version": "1.0.0",
   "description": "",
   "main": "dist/drydock.js",
@@ -13,16 +13,16 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/777abhi/DryDock.git"
+    "url": "git+https://github.com/777abhi/dry-dock.git"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "bugs": {
-    "url": "https://github.com/777abhi/DryDock/issues"
+    "url": "https://github.com/777abhi/dry-dock/issues"
   },
-  "homepage": "https://github.com/777abhi/DryDock#readme",
+  "homepage": "https://github.com/777abhi/dry-dock#readme",
   "dependencies": {
     "@jscpd/tokenizer": "^4.0.4",
     "fast-glob": "^3.3.3",
