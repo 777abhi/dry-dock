@@ -197,12 +197,12 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
             // Build Table
             let html = '<table class="min-w-full border-collapse"><thead><tr><th class="border p-2 bg-gray-50"></th>';
             projectList.forEach(p => {
-                html += \`<th class="border p-2 bg-gray-50 font-semibold text-sm rotate-0">\${p}</th>\`;
+                html += \`<th class="border p-2 bg-gray-50 font-semibold text-sm rotate-0">\${escapeHtml(p)}</th>\`;
             });
             html += '</tr></thead><tbody>';
 
             projectList.forEach(p1 => {
-                html += \`<tr><td class="border p-2 font-semibold bg-gray-50 text-sm">\${p1}</td>\`;
+                html += \`<tr><td class="border p-2 font-semibold bg-gray-50 text-sm">\${escapeHtml(p1)}</td>\`;
                 projectList.forEach(p2 => {
                     if (p1 === p2) {
                          html += '<td class="border p-2 text-center text-gray-300">-</td>';
@@ -226,12 +226,12 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
                     <div>
                         <div class="font-mono text-xs text-gray-500 mb-1">Hash: \${item.hash.slice(0, 8)}...</div>
                         <div class="text-lg font-semibold text-gray-900">
-                            \${item.lines} lines shared across <span class="text-blue-600">\${item.projects.join(', ')}</span>
+                            \${item.lines} lines shared across <span class="text-blue-600">\${item.projects.map(p => escapeHtml(p)).join(', ')}</span>
                         </div>
                         <div class="text-sm text-gray-600 mt-2">
                              Found in: \${item.occurrences.map(o => {
-                                 const meta = o.author ? \` title="Last modified by \${o.author} on \${o.date}"\` : '';
-                                 return \`<code class="bg-gray-100 px-1 py-0.5 rounded text-xs cursor-help"\${meta}>\${o.file}</code>\`;
+                                 const meta = o.author ? \` title="Last modified by \${escapeHtml(o.author)} on \${o.date}"\` : '';
+                                 return \`<code class="bg-gray-100 px-1 py-0.5 rounded text-xs cursor-help"\${meta}>\${escapeHtml(o.file)}</code>\`;
                              }).join(', ')}
                         </div>
                     </div>
@@ -265,13 +265,13 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
                      fetch(\`/api/code?file=\${encodeURIComponent(occ2.file)}\`).then(r => r.text())
                  ]);
 
-                 content.innerHTML = \`
+             content.innerHTML = \`
                     <div class="flex flex-col h-full overflow-hidden border rounded">
-                        <div class="bg-gray-100 p-2 border-b font-mono text-sm font-semibold">\${occ1.file} (\${occ1.project})</div>
+                        <div class="bg-gray-100 p-2 border-b font-mono text-sm font-semibold">\${escapeHtml(occ1.file)} (\${escapeHtml(occ1.project)})</div>
                         <pre class="flex-1 overflow-auto p-4 text-xs bg-gray-50"><code>\${escapeHtml(code1)}</code></pre>
                     </div>
                     <div class="flex flex-col h-full overflow-hidden border rounded">
-                        <div class="bg-gray-100 p-2 border-b font-mono text-sm font-semibold">\${occ2.file} (\${occ2.project})</div>
+                        <div class="bg-gray-100 p-2 border-b font-mono text-sm font-semibold">\${escapeHtml(occ2.file)} (\${escapeHtml(occ2.project)})</div>
                         <pre class="flex-1 overflow-auto p-4 text-xs bg-gray-50"><code>\${escapeHtml(code2)}</code></pre>
                     </div>
                  \`;
@@ -285,7 +285,8 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
         }
 
         function escapeHtml(text) {
-            return text
+            if (!text) return '';
+            return String(text)
                 .replace(/&/g, "&amp;")
                 .replace(/</g, "&lt;")
                 .replace(/>/g, "&gt;")
@@ -298,9 +299,9 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
         loadData = async () => {
              const response = await fetch('/api/data');
              reportData = await response.json();
-             renderStats(reportData);
-             renderMatrix(reportData);
-             renderLeakage(reportData);
+             if (reportData && (reportData.cross_project_leakage.length > 0 || reportData.internal_duplicates.length > 0)) {
+                 renderReport(reportData);
+             }
         };
 
         loadData();
@@ -395,6 +396,8 @@ async function executeScan(paths: string[], options: ScanOptions): Promise<DryDo
             console.warn(`Error scanning ${file}:`, err);
         }
     }
+
+    console.log(`Found ${allProjects.size} project roots`);
 
     const internal_duplicates: InternalDuplicate[] = [];
     const cross_project_leakage: CrossProjectLeakage[] = [];
@@ -579,6 +582,19 @@ async function main() {
                 if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
                     res.writeHead(403);
                     res.end('Access denied: File outside of project root');
+                    return;
+                }
+
+                // Security check: prevent arbitrary file read (IDOR/LFI)
+                // Only allow files that are part of the current report
+                const isAllowed = currentReport && (
+                    currentReport.internal_duplicates.some(d => d.occurrences.includes(relativePath)) ||
+                    currentReport.cross_project_leakage.some(l => l.occurrences.some(o => o.file === relativePath))
+                );
+
+                if (!isAllowed) {
+                    res.writeHead(403);
+                    res.end('Access denied: File not in report');
                     return;
                 }
 
