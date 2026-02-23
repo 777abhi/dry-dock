@@ -471,6 +471,13 @@ async function main() {
         cliIgnore = [args[ignoreIndex + 1]];
     }
 
+    // Parse formats
+    const formatIndex = args.indexOf('--formats');
+    let formats = ['json'];
+    if (formatIndex !== -1 && args[formatIndex + 1]) {
+        formats = args[formatIndex + 1].split(',').map(f => f.trim().toLowerCase());
+    }
+
     const failOnLeaks = args.includes('--fail');
     const shouldOpen = args.includes('--open') || args.length === 0;
 
@@ -492,9 +499,29 @@ async function main() {
         try {
             currentReport = await executeScan(scanArgs, currentCliOptions);
 
-            // Save reports based on formats (simplified for now to JSON default)
-            // In a real refactor, format handling should be robust
-            fs.writeFileSync('drydock-report.json', JSON.stringify(currentReport, null, 2));
+            // Save reports based on formats
+            for (const format of formats) {
+                switch (format) {
+                    case 'json':
+                        fs.writeFileSync('drydock-report.json', JSON.stringify(currentReport, null, 2));
+                        console.log('Report saved to drydock-report.json');
+                        break;
+                    case 'csv':
+                        fs.writeFileSync('drydock-report.csv', exportToCSV(currentReport));
+                        console.log('Report saved to drydock-report.csv');
+                        break;
+                    case 'junit':
+                        fs.writeFileSync('drydock-report.xml', exportToJUnit(currentReport));
+                        console.log('Report saved to drydock-report.xml');
+                        break;
+                    case 'html':
+                        fs.writeFileSync('drydock-report.html', exportToHTML(currentReport, DASHBOARD_HTML));
+                        console.log('Report saved to drydock-report.html');
+                        break;
+                    default:
+                        console.warn(`Unknown format: ${format}`);
+                }
+            }
 
             const crossCount = currentReport.cross_project_leakage.length;
             if (failOnLeaks && crossCount > 0) {
