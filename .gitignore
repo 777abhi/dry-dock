@@ -3,3 +3,6 @@ dist/
 coverage/
 drydock-report.json
 test-results/
+drydock-report.csv
+drydock-report.xml
+drydock-report.html

@@ -73,6 +73,7 @@ You can point to different project folder locations using relative or absolute p
 | `--open` | Launch the interactive dashboard after scanning. |
 | `--min-lines <n>` | Minimum number of lines for a block to be considered a duplicate (default: 0). |
 | `--fail` | Exit with code 1 if cross-project leaks are detected (useful for CI/CD). |
+| `--formats <list>` | Comma-separated list of output formats: `json`, `csv`, `junit`, `html` (default: `json`). |
 
 ## Configuration
 
@@ -169,7 +170,7 @@ The following features are planned to further improve the utility:
 3. [x] **CI/CD Integration:** Add exit codes and failure thresholds for build pipeline integration.
 4. [x] **Custom Thresholds:** Allow CLI flags to set minimum lines or token count for detection.
 5. [x] **Git Blame Integration:** Show the author and commit date for duplicated code blocks.
-6. **Export to Formats:** Support export to HTML (static), CSV, and JUnit XML.
+6. [x] **Export to Formats:** Support export to HTML (static), CSV, and JUnit XML.
 7. **Historical Analysis:** Track duplication trends over time by comparing reports.
 8. **Clone Diff View:** Visual highlight of differences (if any) in structural clones.
 9. **Language Agnostic Extensions:** Easier plugin system for adding support for more languages.
