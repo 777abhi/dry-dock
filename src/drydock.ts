@@ -315,6 +315,7 @@ import { exec } from 'child_process';
 interface ScanOptions {
     minLines: number;
     ignorePatterns: string[];
+    whitelist?: string[];
 }
 
 // Global cancellation state
@@ -382,6 +383,7 @@ async function executeScan(paths: string[], options: ScanOptions): Promise<DryDo
             const result = scanFile(file);
             if (result) {
                 if (result.lines < options.minLines) continue;
+                if (options.whitelist && options.whitelist.includes(result.hash)) continue;
 
                 allProjects.add(result.project);
                 if (!index.has(result.hash)) {
@@ -452,7 +454,7 @@ async function executeScan(paths: string[], options: ScanOptions): Promise<DryDo
 }
 
 let currentReport: DryDockReport | null = null;
-let currentCliOptions: ScanOptions = { minLines: 0, ignorePatterns: [] };
+let currentCliOptions: ScanOptions = { minLines: 0, ignorePatterns: [], whitelist: [] };
 
 async function main() {
     const args = process.argv.slice(2);
@@ -478,6 +480,25 @@ async function main() {
         formats = args[formatIndex + 1].split(',').map(f => f.trim().toLowerCase());
     }
 
+    // Parse whitelist
+    const whitelistIndex = args.indexOf('--whitelist');
+    let whitelistFile = '.drydockwhitelist';
+    if (whitelistIndex !== -1 && args[whitelistIndex + 1]) {
+        whitelistFile = args[whitelistIndex + 1];
+    }
+
+    let whitelist: string[] = [];
+    const whitelistPath = path.resolve(process.cwd(), whitelistFile);
+    if (fs.existsSync(whitelistPath)) {
+        try {
+            const content = fs.readFileSync(whitelistPath, 'utf-8');
+            whitelist = content.split(/\r?\n/).map(line => line.trim()).filter(line => line && !line.startsWith('#'));
+            console.log(`Loaded ${whitelist.length} whitelist entries from ${whitelistFile}`);
+        } catch (err) {
+            console.warn(`Failed to read whitelist file ${whitelistFile}:`, err);
+        }
+    }
+
     const failOnLeaks = args.includes('--fail');
     const shouldOpen = args.includes('--open') || args.length === 0;
 
@@ -490,7 +511,8 @@ async function main() {
 
     currentCliOptions = {
         minLines,
-        ignorePatterns: [...getIgnorePatterns(), ...cliIgnore]
+        ignorePatterns: [...getIgnorePatterns(), ...cliIgnore],
+        whitelist
     };
 
     // If paths provided, run immediate scan

@@ -74,10 +74,19 @@ You can point to different project folder locations using relative or absolute p
 | `--min-lines <n>` | Minimum number of lines for a block to be considered a duplicate (default: 0). |
 | `--fail` | Exit with code 1 if cross-project leaks are detected (useful for CI/CD). |
 | `--formats <list>` | Comma-separated list of output formats: `json`, `csv`, `junit`, `html` (default: `json`). |
+| `--whitelist <file>` | Path to a file containing duplicate hashes to ignore (defaults to `.drydockwhitelist`). |
 
 ## Configuration
 
 You can create a `.drydockignore` file in the current directory to exclude specific files or directories from the scan. The format is similar to `.gitignore`.
+
+You can also create a `.drydockwhitelist` file to tell dry-dock to ignore specific structural clones. This is useful for marking "accepted" duplicates or false positives. Add the hash of the duplicate (found in the JSON report or dashboard) on a new line. You can add comments starting with `#`.
+
+Example `.drydockwhitelist`:
+```
+# Ignore this specific boilerplate class
+085731f120ffe1ec0c734b60935777b44faeae20876226d79265f824fbc3a1b1
+```
 
 Example `.drydockignore`:
 ```
@@ -180,8 +189,9 @@ The following features are planned to further improve the utility:
 13. **Dependency Analysis:** Flag duplicates that match known open-source libraries.
 14. **Auto-Refactor Suggestions:** Generate boilerplate for extracting duplicates into a shared library.
 15. **Graph Visualization:** Node-link diagram showing dependency relationships between projects based on leaks.
-16. **Whitelisting:** Ability to mark specific duplicates as "accepted" or "false positive".
+16. [x] **Whitelisting:** Ability to mark specific duplicates as "accepted" or "false positive".
 17. **Docker Support:** Official Docker image for easy deployment in containerized environments.
 18. **REST API:** Expose the dashboard server as an API for external tools.
 19. **Slack/Teams Notifications:** Webhooks to notify teams when new cross-project leaks are detected.
 20. **Monorepo Support:** Specialized optimization and logic for massive monorepos (e.g., Lerna, Nx, Turborepo).
+21. **AI-Powered False Positive Detection:** Utilise LLMs to automatically analyze duplication contexts and automatically suggest hashes for whitelisting if they represent semantically diverse yet structurally similar boilerplate.
