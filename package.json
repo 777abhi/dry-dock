@@ -9,7 +9,7 @@
   "scripts": {
     "start": "chmod +x ./setup_real_world_example.sh && ./setup_real_world_example.sh && ts-node src/drydock.ts scan mock-repos/inventory-service mock-repos/order-service --open",
     "dev": "ts-node src/drydock.ts scan . --ignore mock-repos --open",
-    "test": "ts-node tests/test_identifier.ts && ts-node tests/test_scanner.ts && ts-node tests/test_scanner_edge_cases.ts && ts-node tests/test_cli.ts"
+    "test": "ts-node tests/test_identifier.ts && ts-node tests/test_scanner.ts && ts-node tests/test_scanner_edge_cases.ts && ts-node tests/test_cli.ts && ts-node tests/test_whitelist.ts"
   },
   "repository": {
     "type": "git",
