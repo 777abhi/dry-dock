@@ -9,6 +9,7 @@ import { getIgnorePatterns } from './utils';
 import { getGitInfo } from './git-utils';
 import { DryDockReport, InternalDuplicate, CrossProjectLeakage, Occurrence } from './types';
 import { exportToCSV, exportToJUnit, exportToHTML } from './reporter';
+import { analyzeTrend, TrendResult } from './trend';
 
 const DASHBOARD_HTML = `<!DOCTYPE html>
 <html lang="en">
@@ -483,6 +484,13 @@ async function main() {
     // Parse whitelist
     const whitelistIndex = args.indexOf('--whitelist');
     let whitelistFile = '.drydockwhitelist';
+
+    // Parse compare
+    const compareIndex = args.indexOf('--compare');
+    let comparePath: string | null = null;
+    if (compareIndex !== -1 && args[compareIndex + 1]) {
+        comparePath = args[compareIndex + 1];
+    }
     if (whitelistIndex !== -1 && args[whitelistIndex + 1]) {
         whitelistFile = args[whitelistIndex + 1];
     }
@@ -542,6 +550,27 @@ async function main() {
                         break;
                     default:
                         console.warn(`Unknown format: ${format}`);
+                }
+            }
+
+            if (comparePath) {
+                if (fs.existsSync(comparePath)) {
+                    console.log(`\nComparing against previous report: ${comparePath}`);
+                    const oldReportRaw = fs.readFileSync(comparePath, 'utf-8');
+                    try {
+                        const oldReport: DryDockReport = JSON.parse(oldReportRaw);
+                        const trend: TrendResult = analyzeTrend(oldReport, currentReport);
+                        console.log('--- Trend Analysis ---');
+                        console.log(`New leaks introduced: ${trend.newLeaks.length}`);
+                        console.log(`Leaks resolved: ${trend.resolvedLeaks.length}`);
+                        console.log(`Leaks remaining: ${trend.remainingLeaks.length}`);
+                        console.log(`Total RefactorScore change: ${trend.scoreChange > 0 ? '+' : ''}${Math.round(trend.scoreChange)}`);
+                        console.log('----------------------\n');
+                    } catch (err) {
+                        console.warn('Failed to parse old report for comparison:', err);
+                    }
+                } else {
+                    console.warn(`Comparison report not found at: ${comparePath}`);
                 }
             }
 
