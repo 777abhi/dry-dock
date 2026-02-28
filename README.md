@@ -75,6 +75,7 @@ You can point to different project folder locations using relative or absolute p
 | `--fail` | Exit with code 1 if cross-project leaks are detected (useful for CI/CD). |
 | `--formats <list>` | Comma-separated list of output formats: `json`, `csv`, `junit`, `html` (default: `json`). |
 | `--whitelist <file>` | Path to a file containing duplicate hashes to ignore (defaults to `.drydockwhitelist`). |
+| `--compare <file>` | Path to a previous `drydock-report.json` to perform a trend analysis on new, resolved, and remaining leaks. |
 
 ## Configuration
 
@@ -180,7 +181,7 @@ The following features are planned to further improve the utility:
 4. [x] **Custom Thresholds:** Allow CLI flags to set minimum lines or token count for detection.
 5. [x] **Git Blame Integration:** Show the author and commit date for duplicated code blocks.
 6. [x] **Export to Formats:** Support export to HTML (static), CSV, and JUnit XML.
-7. **Historical Analysis:** Track duplication trends over time by comparing reports.
+7. [x] **Historical Analysis:** Track duplication trends over time by comparing reports.
 8. **Clone Diff View:** Visual highlight of differences (if any) in structural clones.
 9. **Language Agnostic Extensions:** Easier plugin system for adding support for more languages.
 10. **Parallel Processing:** Multi-threaded scanning for large repositories to improve performance.
@@ -195,3 +196,4 @@ The following features are planned to further improve the utility:
 19. **Slack/Teams Notifications:** Webhooks to notify teams when new cross-project leaks are detected.
 20. **Monorepo Support:** Specialized optimization and logic for massive monorepos (e.g., Lerna, Nx, Turborepo).
 21. **AI-Powered False Positive Detection:** Utilise LLMs to automatically analyze duplication contexts and automatically suggest hashes for whitelisting if they represent semantically diverse yet structurally similar boilerplate.
+22. **Trend Visualisation in Dashboard:** Add historical trend graphs to the dashboard to visualise RefactorScore changes over time.
