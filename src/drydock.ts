@@ -42,6 +42,14 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
         </div>
 
         <div id="results-container" class="space-y-8 hidden">
+            <!-- Trend Analysis Section -->
+            <div id="trend-section" class="bg-white rounded-lg shadow p-6 hidden">
+                <h2 class="text-xl font-bold mb-4 text-gray-800">Trend Analysis</h2>
+                <div id="trend-container" class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <!-- Trend metrics will be rendered here -->
+                </div>
+            </div>
+
              <!-- Leakage Matrix -->
             <div class="bg-white rounded-lg shadow p-6 overflow-x-auto">
                 <h2 class="text-xl font-bold mb-4 text-gray-800">Project Leakage Matrix</h2>
@@ -139,17 +147,22 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
 
         async function loadData() {
             try {
-                const response = await fetch('/api/data');
-                const report = await response.json();
+                const [reportResponse, trendResponse] = await Promise.all([
+                    fetch('/api/data'),
+                    fetch('/api/trend').then(res => res.ok ? res.json() : null).catch(() => null)
+                ]);
+                const report = await reportResponse.json();
+                const trend = trendResponse;
+
                 if (report && (report.cross_project_leakage.length > 0 || report.internal_duplicates.length > 0)) {
-                   renderReport(report);
+                   renderReport(report, trend);
                 }
             } catch (error) {
-                console.log('No existing report data found.');
+                console.log('No existing report data found.', error);
             }
         }
 
-        function renderReport(report) {
+        function renderReport(report, trend = null) {
             reportData = report;
             document.getElementById('results-container').classList.remove('hidden');
             document.getElementById('empty-state').classList.add('hidden');
@@ -157,6 +170,35 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
             renderStats(report);
             renderMatrix(report);
             renderLeakage(report);
+            if (trend && trend.scoreChange !== undefined) {
+                renderTrend(trend);
+            }
+        }
+
+        function renderTrend(trend) {
+            document.getElementById('trend-section').classList.remove('hidden');
+            const container = document.getElementById('trend-container');
+            const scoreColor = trend.scoreChange > 0 ? 'text-red-600' : (trend.scoreChange < 0 ? 'text-green-600' : 'text-gray-600');
+            const scoreSign = trend.scoreChange > 0 ? '+' : '';
+
+            container.innerHTML = \`
+                <div class="p-4 bg-gray-50 rounded border text-center">
+                    <div class="text-sm text-gray-500 uppercase tracking-wide">New Leaks</div>
+                    <div class="text-2xl font-bold text-red-600">\${trend.newLeaks.length}</div>
+                </div>
+                <div class="p-4 bg-gray-50 rounded border text-center">
+                    <div class="text-sm text-gray-500 uppercase tracking-wide">Resolved Leaks</div>
+                    <div class="text-2xl font-bold text-green-600">\${trend.resolvedLeaks.length}</div>
+                </div>
+                <div class="p-4 bg-gray-50 rounded border text-center">
+                    <div class="text-sm text-gray-500 uppercase tracking-wide">Remaining Leaks</div>
+                    <div class="text-2xl font-bold text-yellow-600">\${trend.remainingLeaks.length}</div>
+                </div>
+                <div class="p-4 bg-gray-50 rounded border text-center">
+                    <div class="text-sm text-gray-500 uppercase tracking-wide">Score Change</div>
+                    <div class="text-2xl font-bold \${scoreColor}">\${scoreSign}\${Math.round(trend.scoreChange)}</div>
+                </div>
+            \`;
         }
 
         function renderStats(report) {
@@ -298,10 +340,24 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
         // Hook loadData to save report
         const originalLoadData = loadData;
         loadData = async () => {
-             const response = await fetch('/api/data');
-             reportData = await response.json();
-             if (reportData && (reportData.cross_project_leakage.length > 0 || reportData.internal_duplicates.length > 0)) {
-                 renderReport(reportData);
+             try {
+                 const [response, trendResponse] = await Promise.all([
+                     fetch('/api/data'),
+                     fetch('/api/trend').then(res => res.ok ? res.json() : null).catch(() => null)
+                 ]);
+                 reportData = await response.json();
+                 const trendData = trendResponse;
+
+                 // Hide trend section if there's no trend data (e.g. after a new scan)
+                 if (!trendData) {
+                     document.getElementById('trend-section').classList.add('hidden');
+                 }
+
+                 if (reportData && (reportData.cross_project_leakage.length > 0 || reportData.internal_duplicates.length > 0)) {
+                     renderReport(reportData, trendData);
+                 }
+             } catch (error) {
+                 console.error('Failed to load updated report data', error);
              }
         };
 
@@ -455,6 +511,7 @@ async function executeScan(paths: string[], options: ScanOptions): Promise<DryDo
 }
 
 let currentReport: DryDockReport | null = null;
+let currentTrendData: TrendResult | null = null;
 let currentCliOptions: ScanOptions = { minLines: 0, ignorePatterns: [], whitelist: [] };
 
 async function main() {
@@ -560,6 +617,7 @@ async function main() {
                     try {
                         const oldReport: DryDockReport = JSON.parse(oldReportRaw);
                         const trend: TrendResult = analyzeTrend(oldReport, currentReport);
+                        currentTrendData = trend;
                         console.log('--- Trend Analysis ---');
                         console.log(`New leaks introduced: ${trend.newLeaks.length}`);
                         console.log(`Leaks resolved: ${trend.resolvedLeaks.length}`);
@@ -598,6 +656,14 @@ async function main() {
             } else if (parsedUrl.pathname === '/api/data') {
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify(currentReport || { internal_duplicates: [], cross_project_leakage: [] }));
+            } else if (parsedUrl.pathname === '/api/trend') {
+                if (currentTrendData) {
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify(currentTrendData));
+                } else {
+                    res.writeHead(404, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'No trend data available' }));
+                }
             } else if (parsedUrl.pathname === '/api/scan' && req.method === 'POST') {
                 let body = '';
                 req.on('data', chunk => body += chunk);
@@ -606,6 +672,7 @@ async function main() {
                         const { paths } = JSON.parse(body);
                         if (paths && Array.isArray(paths)) {
                             console.log('Triggering scan for:', paths);
+                            currentTrendData = null; // Clear old trend data on fresh scan
                             currentReport = await executeScan(paths, currentCliOptions);
                             res.writeHead(200, { 'Content-Type': 'application/json' });
                             res.end(JSON.stringify(currentReport));
