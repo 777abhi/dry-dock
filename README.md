@@ -196,4 +196,5 @@ The following features are planned to further improve the utility:
 19. **Slack/Teams Notifications:** Webhooks to notify teams when new cross-project leaks are detected.
 20. **Monorepo Support:** Specialized optimization and logic for massive monorepos (e.g., Lerna, Nx, Turborepo).
 21. **AI-Powered False Positive Detection:** Utilise LLMs to automatically analyze duplication contexts and automatically suggest hashes for whitelisting if they represent semantically diverse yet structurally similar boilerplate.
-22. **Trend Visualisation in Dashboard:** Add historical trend graphs to the dashboard to visualise RefactorScore changes over time.
+22. [x] **Trend Visualisation in Dashboard:** Add historical trend graphs to the dashboard to visualise RefactorScore changes over time.
+23. **Code Smells & Complexity Integration:** Incorporate Cyclomatic Complexity metrics and code smell analysis directly into the Code Inspector to guide deeper refactoring.

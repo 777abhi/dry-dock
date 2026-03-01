@@ -57,4 +57,75 @@ function runTests() {
     console.log("PASS: analyzeTrend correctly identified new, resolved, and remaining leaks, and calculated score change.");
 }
 
-runTests();
+import * as http from 'http';
+import { exec } from 'child_process';
+import * as path from 'path';
+
+async function testApiEndpoint() {
+    console.log("Testing /api/trend endpoint...");
+
+    // Start the dashboard server in a child process
+    const scriptPath = path.join(__dirname, '..', 'src', 'drydock.ts');
+    const child = exec(`npx ts-node ${scriptPath} scan . --open`);
+
+    // Wait for the server to start using a retry mechanism
+    let isServerUp = false;
+    for (let i = 0; i < 20; i++) {
+        try {
+            await new Promise<void>((resolve, reject) => {
+                http.get('http://localhost:3000', (res) => {
+                    resolve();
+                }).on('error', reject);
+            });
+            isServerUp = true;
+            break;
+        } catch (e) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+        }
+    }
+
+    if (!isServerUp) {
+        console.error("FAIL: Dashboard server failed to start.");
+        if (child.pid) { try { process.kill(child.pid); } catch (e) {} }
+        process.exit(1);
+    }
+
+    let hasError = false;
+
+    try {
+        const data = await new Promise<string>((resolve, reject) => {
+            http.get('http://localhost:3000/api/trend', (res) => {
+                let rawData = '';
+                res.on('data', (chunk) => { rawData += chunk; });
+                res.on('end', () => { resolve(rawData); });
+            }).on('error', (e) => {
+                reject(e);
+            });
+        });
+
+        const parsed = JSON.parse(data);
+        if (!parsed.newLeaks || !parsed.resolvedLeaks || !parsed.remainingLeaks || parsed.scoreChange === undefined) {
+             console.error("FAIL: /api/trend endpoint returned invalid payload:", parsed);
+             hasError = true;
+        } else {
+             console.log("PASS: /api/trend endpoint returned valid trend structure.");
+        }
+    } catch (e) {
+        console.error("FAIL: Could not reach /api/trend endpoint:", e);
+        hasError = true;
+    } finally {
+        if (child.pid) {
+            try { process.kill(child.pid); } catch (e) {}
+            // On Windows, child.kill might be needed, but kill works on Posix
+            try { child.kill('SIGTERM'); } catch (e) {}
+        }
+        process.exit(hasError ? 1 : 0);
+    }
+}
+
+async function runAll() {
+    runTests();
+    await testApiEndpoint();
+}
+
+runAll();

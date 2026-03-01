@@ -1,0 +1,47 @@
+{
+  "internal_duplicates": [],
+  "cross_project_leakage": [
+    {
+      "hash": "hash1",
+      "lines": 50,
+      "frequency": 2,
+      "spread": 2,
+      "score": 100,
+      "projects": [
+        "projA",
+        "projB"
+      ],
+      "occurrences": [
+        {
+          "file": "projA/file.js",
+          "project": "projA"
+        },
+        {
+          "file": "projB/file.js",
+          "project": "projB"
+        }
+      ]
+    },
+    {
+      "hash": "hash2",
+      "lines": 30,
+      "frequency": 2,
+      "spread": 2,
+      "score": 60,
+      "projects": [
+        "projA",
+        "projB"
+      ],
+      "occurrences": [
+        {
+          "file": "projA/other.js",
+          "project": "projA"
+        },
+        {
+          "file": "projB/other.js",
+          "project": "projB"
+        }
+      ]
+    }
+  ]
+}
