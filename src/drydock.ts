@@ -646,9 +646,10 @@ async function main() {
     }
 
     if (shouldOpen || scanArgs.length === 0) {
+        const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
         const server = http.createServer(async (req, res) => {
             // ... (keep existing request handling) ...
-            const parsedUrl = new URL(req.url || '', 'http://localhost:3000');
+            const parsedUrl = new URL(req.url || '', `http://localhost:${port}`);
 
             if (parsedUrl.pathname === '/') {
                 res.writeHead(200, { 'Content-Type': 'text/html' });
@@ -766,8 +767,8 @@ async function main() {
 
         server.on('error', (e: any) => {
             if (e.code === 'EADDRINUSE') {
-                console.error('Error: Port 3000 is already in use.');
-                console.error('Please stop the existing process running on port 3000 or use a different port.');
+                console.error(`Error: Port ${port} is already in use.`);
+                console.error(`Please stop the existing process running on port ${port} or use a different port (e.g., set PORT env).`);
                 process.exit(1);
             } else {
                 console.error('Server error:', e);
@@ -775,8 +776,8 @@ async function main() {
             }
         });
 
-        server.listen(3000, () => {
-            console.log('Dashboard successfully launched at http://localhost:3000');
+        server.listen(port, () => {
+            console.log(`Dashboard successfully launched at http://localhost:${port}`);
             console.log('Press Ctrl+C to stop the server.');
         });
 
