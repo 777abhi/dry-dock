@@ -66,7 +66,8 @@ async function testApiEndpoint() {
 
     // Start the dashboard server in a child process
     const scriptPath = path.join(__dirname, '..', 'src', 'drydock.ts');
-    const child = exec(`npx ts-node ${scriptPath} scan . --open`);
+    const oldReportPath = path.join(__dirname, '..', 'old-report.json');
+    const child = exec(`npx ts-node ${scriptPath} scan . --compare ${oldReportPath} --open`);
 
     // Wait for the server to start using a retry mechanism
     let isServerUp = false;
