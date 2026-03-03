@@ -17,3 +17,8 @@ Constraint: Ensure `TrendResult` is safely handled on the client side if the API
 Decision: Provide baseline `--compare` flag with a mock/old report during dashboard e2e or unit tests.
 Reasoning: We needed to verify that the `/api/trend` returns a valid payload structure when trend data is actually present, which is only possible if `--compare` is used to load an `oldReport`.
 Constraint: Do not rely on server implicit behaviour; make test environment configurations explicit so the server handles endpoints as it would in production with the expected flags.
+
+## 2026-03-03 - [Server Test Reliability]
+Decision: Update server startup sequence to natively handle `PORT=0` and allocate random ports, and reflect this dynamically in both logs and API test endpoints.
+Reasoning: We needed to resolve port collisions when testing the interactive dashboard, especially in parallel test environments or when the local dev env is already using port 3000. Hardcoded test ports are brittle. Using `server.address().port` ensures tests target the correct live instance.
+Constraint: When writing tests that extract data from process stdout streams, always ensure you buffer the stream chunks before regex matching to avoid issues where log lines are split across multiple buffer emissions.

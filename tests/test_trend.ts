@@ -67,35 +67,52 @@ async function testApiEndpoint() {
     // Start the dashboard server in a child process
     const scriptPath = path.join(__dirname, '..', 'src', 'drydock.ts');
     const oldReportPath = path.join(__dirname, '..', 'old-report.json');
-    const child = exec(`npx ts-node ${scriptPath} scan . --compare ${oldReportPath} --open`);
+    const env = { ...process.env, PORT: '0' };
+    const child = exec(`npx ts-node ${scriptPath} scan . --compare ${oldReportPath} --open`, { env });
+
+    let allocatedPort: number | null = null;
+    let hasError = false;
+
+    // Listen to stdout to grab the allocated port
+    let outputBuffer = '';
+    child.stdout?.on('data', (data: string) => {
+        outputBuffer += data;
+        if (allocatedPort === null) {
+            const match = outputBuffer.match(/Dashboard successfully launched at http:\/\/localhost:(\d+)/);
+            if (match && match[1]) {
+                allocatedPort = parseInt(match[1], 10);
+            }
+        }
+    });
 
     // Wait for the server to start using a retry mechanism
     let isServerUp = false;
-    for (let i = 0; i < 20; i++) {
-        try {
-            await new Promise<void>((resolve, reject) => {
-                http.get('http://localhost:3000', (res) => {
-                    resolve();
-                }).on('error', reject);
-            });
-            isServerUp = true;
-            break;
-        } catch (e) {
-            await new Promise(resolve => setTimeout(resolve, 500));
+    for (let i = 0; i < 40; i++) {
+        if (allocatedPort !== null && allocatedPort > 0) {
+            try {
+                await new Promise<void>((resolve, reject) => {
+                    http.get(`http://localhost:${allocatedPort}`, (res) => {
+                        resolve();
+                    }).on('error', reject);
+                });
+                isServerUp = true;
+                break;
+            } catch (e) {
+                // Ignore and retry
+            }
         }
+        await new Promise(resolve => setTimeout(resolve, 500));
     }
 
     if (!isServerUp) {
-        console.error("FAIL: Dashboard server failed to start.");
+        console.error("FAIL: Dashboard server failed to start dynamically or failed to report the allocated port.");
         if (child.pid) { try { process.kill(child.pid); } catch (e) {} }
         process.exit(1);
     }
 
-    let hasError = false;
-
     try {
         const data = await new Promise<string>((resolve, reject) => {
-            http.get('http://localhost:3000/api/trend', (res) => {
+            http.get(`http://localhost:${allocatedPort}/api/trend`, (res) => {
                 let rawData = '';
                 res.on('data', (chunk) => { rawData += chunk; });
                 res.on('end', () => { resolve(rawData); });
