@@ -198,4 +198,5 @@ The following features are planned to further improve the utility:
 21. **AI-Powered False Positive Detection:** Utilise LLMs to automatically analyze duplication contexts and automatically suggest hashes for whitelisting if they represent semantically diverse yet structurally similar boilerplate.
 22. [x] **Trend Visualisation in Dashboard:** Add historical trend graphs to the dashboard to visualise RefactorScore changes over time.
 23. **Code Smells & Complexity Integration:** Incorporate Cyclomatic Complexity metrics and code smell analysis directly into the Code Inspector to guide deeper refactoring.
-24. **Server Test Reliability:** Introduce random or dynamically allocated ports for local testing to avoid port collisions when testing the interactive dashboard and its APIs.
+24. [x] **Server Test Reliability:** Introduce random or dynamically allocated ports for local testing to avoid port collisions when testing the interactive dashboard and its APIs.
+25. **Export to PDF:** Allow exporting the current dashboard and leakage statistics to a PDF format to send reports directly to management or executives without requiring server access.

@@ -646,10 +646,11 @@ async function main() {
     }
 
     if (shouldOpen || scanArgs.length === 0) {
-        const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+        const initialPort = process.env.PORT !== undefined ? parseInt(process.env.PORT, 10) : 3000;
         const server = http.createServer(async (req, res) => {
             // ... (keep existing request handling) ...
-            const parsedUrl = new URL(req.url || '', `http://localhost:${port}`);
+            const actualPort = (server.address() as any)?.port || initialPort;
+            const parsedUrl = new URL(req.url || '', `http://localhost:${actualPort}`);
 
             if (parsedUrl.pathname === '/') {
                 res.writeHead(200, { 'Content-Type': 'text/html' });
@@ -767,8 +768,8 @@ async function main() {
 
         server.on('error', (e: any) => {
             if (e.code === 'EADDRINUSE') {
-                console.error(`Error: Port ${port} is already in use.`);
-                console.error(`Please stop the existing process running on port ${port} or use a different port (e.g., set PORT env).`);
+                console.error(`Error: Port ${initialPort} is already in use.`);
+                console.error(`Please stop the existing process running on port ${initialPort} or use a different port (e.g., set PORT env).`);
                 process.exit(1);
             } else {
                 console.error('Server error:', e);
@@ -776,8 +777,9 @@ async function main() {
             }
         });
 
-        server.listen(port, () => {
-            console.log(`Dashboard successfully launched at http://localhost:${port}`);
+        server.listen(initialPort, () => {
+            const actualPort = (server.address() as any)?.port || initialPort;
+            console.log(`Dashboard successfully launched at http://localhost:${actualPort}`);
             console.log('Press Ctrl+C to stop the server.');
         });
 
