@@ -22,3 +22,8 @@ Constraint: Do not rely on server implicit behaviour; make test environment conf
 Decision: Update server startup sequence to natively handle `PORT=0` and allocate random ports, and reflect this dynamically in both logs and API test endpoints.
 Reasoning: We needed to resolve port collisions when testing the interactive dashboard, especially in parallel test environments or when the local dev env is already using port 3000. Hardcoded test ports are brittle. Using `server.address().port` ensures tests target the correct live instance.
 Constraint: When writing tests that extract data from process stdout streams, always ensure you buffer the stream chunks before regex matching to avoid issues where log lines are split across multiple buffer emissions.
+
+## 2026-03-04 - [Slack/Teams Webhook Notifications]
+Decision: Introduce a decoupled `WebhookNotifier` class and an `INotifier` interface.
+Reasoning: To meet roadmap goals for CI/CD integrations, we need a flexible notification system. Decoupling notification logic via an interface ensures we can add email or other types of notifiers in the future without bloating core logic.
+Constraint: Ensure the payload is formatted to be universally compatible with common webhook ingests (like Slack).
