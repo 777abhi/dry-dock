@@ -10,6 +10,7 @@ import { getGitInfo } from './git-utils';
 import { DryDockReport, InternalDuplicate, CrossProjectLeakage, Occurrence } from './types';
 import { exportToCSV, exportToJUnit, exportToHTML } from './reporter';
 import { analyzeTrend, TrendResult } from './trend';
+import { WebhookNotifier } from './notifier';
 
 const DASHBOARD_HTML = `<!DOCTYPE html>
 <html lang="en">
@@ -548,6 +549,13 @@ async function main() {
     if (compareIndex !== -1 && args[compareIndex + 1]) {
         comparePath = args[compareIndex + 1];
     }
+
+    // Parse webhook
+    const webhookIndex = args.indexOf('--webhook');
+    let webhookUrl: string | null = null;
+    if (webhookIndex !== -1 && args[webhookIndex + 1]) {
+        webhookUrl = args[webhookIndex + 1];
+    }
     if (whitelistIndex !== -1 && args[whitelistIndex + 1]) {
         whitelistFile = args[whitelistIndex + 1];
     }
@@ -607,6 +615,17 @@ async function main() {
                         break;
                     default:
                         console.warn(`Unknown format: ${format}`);
+                }
+            }
+
+            if (webhookUrl) {
+                console.log(`Sending webhook notification to ${webhookUrl}...`);
+                const notifier = new WebhookNotifier(webhookUrl);
+                try {
+                    await notifier.notify(currentReport);
+                    console.log('Webhook notification sent successfully.');
+                } catch (err: any) {
+                    console.error('Failed to send webhook notification:', err.message);
                 }
             }
 

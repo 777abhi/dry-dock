@@ -76,6 +76,7 @@ You can point to different project folder locations using relative or absolute p
 | `--formats <list>` | Comma-separated list of output formats: `json`, `csv`, `junit`, `html` (default: `json`). |
 | `--whitelist <file>` | Path to a file containing duplicate hashes to ignore (defaults to `.drydockwhitelist`). |
 | `--compare <file>` | Path to a previous `drydock-report.json` to perform a trend analysis on new, resolved, and remaining leaks. |
+| `--webhook <url>` | URL to send a JSON POST request with the scan summary (e.g., for Slack/Teams integration). |
 
 ## Configuration
 
@@ -193,10 +194,11 @@ The following features are planned to further improve the utility:
 16. [x] **Whitelisting:** Ability to mark specific duplicates as "accepted" or "false positive".
 17. **Docker Support:** Official Docker image for easy deployment in containerized environments.
 18. **REST API:** Expose the dashboard server as an API for external tools.
-19. **Slack/Teams Notifications:** Webhooks to notify teams when new cross-project leaks are detected.
+19. [x] **Slack/Teams Notifications:** Webhooks to notify teams when new cross-project leaks are detected.
 20. **Monorepo Support:** Specialized optimization and logic for massive monorepos (e.g., Lerna, Nx, Turborepo).
 21. **AI-Powered False Positive Detection:** Utilise LLMs to automatically analyze duplication contexts and automatically suggest hashes for whitelisting if they represent semantically diverse yet structurally similar boilerplate.
 22. [x] **Trend Visualisation in Dashboard:** Add historical trend graphs to the dashboard to visualise RefactorScore changes over time.
 23. **Code Smells & Complexity Integration:** Incorporate Cyclomatic Complexity metrics and code smell analysis directly into the Code Inspector to guide deeper refactoring.
 24. [x] **Server Test Reliability:** Introduce random or dynamically allocated ports for local testing to avoid port collisions when testing the interactive dashboard and its APIs.
 25. **Export to PDF:** Allow exporting the current dashboard and leakage statistics to a PDF format to send reports directly to management or executives without requiring server access.
+26. **Automated Actionable PR Comments:** Automatically post comments on Pull Requests for any new structural clones introduced in a commit.
