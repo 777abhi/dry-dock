@@ -183,7 +183,7 @@ The following features are planned to further improve the utility:
 5. [x] **Git Blame Integration:** Show the author and commit date for duplicated code blocks.
 6. [x] **Export to Formats:** Support export to HTML (static), CSV, and JUnit XML.
 7. [x] **Historical Analysis:** Track duplication trends over time by comparing reports.
-8. **Clone Diff View:** Visual highlight of differences (if any) in structural clones.
+8. [x] **Clone Diff View:** Visual highlight of differences (if any) in structural clones.
 9. **Language Agnostic Extensions:** Easier plugin system for adding support for more languages.
 10. **Parallel Processing:** Multi-threaded scanning for large repositories to improve performance.
 11. **Interactive CLI Mode:** TUI (Text User Interface) for exploring results in the terminal.
@@ -202,3 +202,4 @@ The following features are planned to further improve the utility:
 24. [x] **Server Test Reliability:** Introduce random or dynamically allocated ports for local testing to avoid port collisions when testing the interactive dashboard and its APIs.
 25. **Export to PDF:** Allow exporting the current dashboard and leakage statistics to a PDF format to send reports directly to management or executives without requiring server access.
 26. **Automated Actionable PR Comments:** Automatically post comments on Pull Requests for any new structural clones introduced in a commit.
+27. **Semantic Refactoring Prompts:** Generate refactoring instructions for developers based on the structural diff to make consolidating code easier.

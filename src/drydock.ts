@@ -11,6 +11,7 @@ import { DryDockReport, InternalDuplicate, CrossProjectLeakage, Occurrence } fro
 import { exportToCSV, exportToJUnit, exportToHTML } from './reporter';
 import { analyzeTrend, TrendResult } from './trend';
 import { WebhookNotifier } from './notifier';
+import { DiffService } from './diff-viewer';
 
 const DASHBOARD_HTML = `<!DOCTYPE html>
 <html lang="en">
@@ -303,24 +304,45 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
              // Take top 2 occurrences for comparison
              const [occ1, occ2] = item.occurrences.slice(0, 2);
 
-             try {
-                 const [code1, code2] = await Promise.all([
-                     fetch(\`/api/code?file=\${encodeURIComponent(occ1.file)}\`).then(r => r.text()),
-                     fetch(\`/api/code?file=\${encodeURIComponent(occ2.file)}\`).then(r => r.text())
-                 ]);
+             const file1 = occ1.file || occ1;
+             const file2 = occ2.file || occ2;
+             const proj1 = occ1.project || item.project;
+             const proj2 = occ2.project || item.project;
 
-             content.innerHTML = \`
+             try {
+                 const diffResponse = await fetch(`/api/diff?file1=${encodeURIComponent(file1)}&file2=${encodeURIComponent(file2)}`);
+                 const diff = await diffResponse.json();
+
+                 let formattedCode1 = '';
+                 let formattedCode2 = '';
+
+                 diff.forEach(part => {
+                     const color = part.added ? 'bg-green-100 text-green-800' :
+                                   part.removed ? 'bg-red-100 text-red-800' : 'text-gray-800';
+                     const escapedValue = escapeHtml(part.value);
+
+                     if (part.added) {
+                         formattedCode2 += \`<span class="\${color}">\${escapedValue}</span>\`;
+                     } else if (part.removed) {
+                         formattedCode1 += \`<span class="\${color}">\${escapedValue}</span>\`;
+                     } else {
+                         formattedCode1 += \`<span class="\${color}">\${escapedValue}</span>\`;
+                         formattedCode2 += \`<span class="\${color}">\${escapedValue}</span>\`;
+                     }
+                 });
+
+                 content.innerHTML = \`
                     <div class="flex flex-col h-full overflow-hidden border rounded">
-                        <div class="bg-gray-100 p-2 border-b font-mono text-sm font-semibold">\${escapeHtml(occ1.file)} (\${escapeHtml(occ1.project)})</div>
-                        <pre class="flex-1 overflow-auto p-4 text-xs bg-gray-50"><code>\${escapeHtml(code1)}</code></pre>
+                        <div class="bg-gray-100 p-2 border-b font-mono text-sm font-semibold">${escapeHtml(file1)} (${escapeHtml(proj1)})</div>
+                        <pre class="flex-1 overflow-auto p-4 text-xs bg-gray-50 whitespace-pre-wrap"><code>\${formattedCode1}</code></pre>
                     </div>
                     <div class="flex flex-col h-full overflow-hidden border rounded">
-                        <div class="bg-gray-100 p-2 border-b font-mono text-sm font-semibold">\${escapeHtml(occ2.file)} (\${escapeHtml(occ2.project)})</div>
-                        <pre class="flex-1 overflow-auto p-4 text-xs bg-gray-50"><code>\${escapeHtml(code2)}</code></pre>
+                        <div class="bg-gray-100 p-2 border-b font-mono text-sm font-semibold">${escapeHtml(file2)} (${escapeHtml(proj2)})</div>
+                        <pre class="flex-1 overflow-auto p-4 text-xs bg-gray-50 whitespace-pre-wrap"><code>\${formattedCode2}</code></pre>
                     </div>
                  \`;
              } catch (e) {
-                 content.innerHTML = '<div class="col-span-2 text-red-600">Error loading code.</div>';
+                 content.innerHTML = '<div class="col-span-2 text-red-600">Error loading diff.</div>';
              }
         }
 
@@ -732,6 +754,63 @@ async function main() {
                     res.writeHead(501);
                     res.end('Not supported on this OS');
                 }
+            } else if (parsedUrl.pathname === '/api/diff') {
+                let file1Param = parsedUrl.searchParams.get('file1');
+                let file2Param = parsedUrl.searchParams.get('file2');
+
+                if (!file1Param || typeof file1Param !== 'string' || !file2Param || typeof file2Param !== 'string') {
+                    res.writeHead(400);
+                    res.end('Missing or invalid file parameters');
+                    return;
+                }
+
+                const filePath1 = path.resolve(process.cwd(), file1Param);
+                const relativePath1 = path.relative(process.cwd(), filePath1);
+                const filePath2 = path.resolve(process.cwd(), file2Param);
+                const relativePath2 = path.relative(process.cwd(), filePath2);
+
+                if (relativePath1.startsWith('..') || path.isAbsolute(relativePath1) ||
+                    relativePath2.startsWith('..') || path.isAbsolute(relativePath2)) {
+                    res.writeHead(403);
+                    res.end('Access denied: File outside of project root');
+                    return;
+                }
+
+                const isAllowed1 = currentReport && (
+                    currentReport.internal_duplicates.some(d => d.occurrences.some((o: any) => o.file === relativePath1 || o === relativePath1)) ||
+                    currentReport.cross_project_leakage.some(l => l.occurrences.some(o => o.file === relativePath1))
+                );
+
+                const isAllowed2 = currentReport && (
+                    currentReport.internal_duplicates.some(d => d.occurrences.some((o: any) => o.file === relativePath2 || o === relativePath2)) ||
+                    currentReport.cross_project_leakage.some(l => l.occurrences.some(o => o.file === relativePath2))
+                );
+
+                if (!isAllowed1 || !isAllowed2) {
+                    res.writeHead(403);
+                    res.end('Access denied: File not in report');
+                    return;
+                }
+
+                if (!fs.existsSync(filePath1) || !fs.existsSync(filePath2)) {
+                    res.writeHead(404);
+                    res.end('File not found');
+                    return;
+                }
+
+                try {
+                    const code1 = fs.readFileSync(filePath1, 'utf-8');
+                    const code2 = fs.readFileSync(filePath2, 'utf-8');
+                    const diffService = new DiffService();
+                    const diffResult = diffService.getDiff(code1, code2);
+
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify(diffResult));
+                } catch (err) {
+                    res.writeHead(500);
+                    res.end('Error calculating diff');
+                }
+
             } else if (parsedUrl.pathname === '/api/code') {
                 let fileParam = parsedUrl.searchParams.get('file');
 
@@ -754,7 +833,7 @@ async function main() {
                 // Security check: prevent arbitrary file read (IDOR/LFI)
                 // Only allow files that are part of the current report
                 const isAllowed = currentReport && (
-                    currentReport.internal_duplicates.some(d => d.occurrences.includes(relativePath)) ||
+                    currentReport.internal_duplicates.some(d => d.occurrences.some((o: any) => o.file === relativePath || o === relativePath)) ||
                     currentReport.cross_project_leakage.some(l => l.occurrences.some(o => o.file === relativePath))
                 );
 

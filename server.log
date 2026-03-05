@@ -1,0 +1,12 @@
+
+> dry-dock@1.0.0 start
+> chmod +x ./setup_real_world_example.sh && ./setup_real_world_example.sh && ts-node src/drydock.ts scan mock-repos/inventory-service mock-repos/order-service --open
+
+Real world example mock repos created in mock-repos/
+Scanning paths: [ 'scan', 'mock-repos/inventory-service', 'mock-repos/order-service' ]
+Starting file search in scan, mock-repos/inventory-service/**/*, mock-repos/order-service/**/*...
+Found 8 files in 0.022s
+Found 2 project roots
+Report saved to drydock-report.json
+Dashboard successfully launched at http://localhost:3000
+Press Ctrl+C to stop the server.

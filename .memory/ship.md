@@ -27,3 +27,8 @@ Constraint: When writing tests that extract data from process stdout streams, al
 Decision: Introduce a decoupled `WebhookNotifier` class and an `INotifier` interface.
 Reasoning: To meet roadmap goals for CI/CD integrations, we need a flexible notification system. Decoupling notification logic via an interface ensures we can add email or other types of notifiers in the future without bloating core logic.
 Constraint: Ensure the payload is formatted to be universally compatible with common webhook ingests (like Slack).
+
+## 2026-03-05 - [Clone Diff View]
+Decision: Add a diff viewer using the `diff` package to visualize how structural clones differ (e.g., changes in variable names or comments). Exposed via `/api/diff`.
+Reasoning: Since DryDock detects structural clones and not just exact string matches, users need to clearly see *how* two clones differ textually in order to effectively consolidate them. Extracting this to `DiffService` keeps `src/drydock.ts` cleaner.
+Constraint: Ensure directory traversal is prevented when fetching files for the diff.
