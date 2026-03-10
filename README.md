@@ -78,6 +78,7 @@ You can point to different project folder locations using relative or absolute p
 | `--compare <file>` | Path to a previous `drydock-report.json` to perform a trend analysis on new, resolved, and remaining leaks. |
 | `--webhook <url>` | URL to send a JSON POST request with the scan summary (e.g., for Slack/Teams integration). |
 | `--language <.ext=format>` | Dynamically register custom file extensions and their corresponding tokenizer formats (e.g., `--language .ex=elixir`). |
+| `--api-only` | Starts the server in REST API mode with CORS headers without running an initial scan or opening the dashboard. |
 
 ## Configuration
 
@@ -194,7 +195,7 @@ The following features are planned to further improve the utility:
 15. **Graph Visualization:** Node-link diagram showing dependency relationships between projects based on leaks.
 16. [x] **Whitelisting:** Ability to mark specific duplicates as "accepted" or "false positive".
 17. **Docker Support:** Official Docker image for easy deployment in containerized environments.
-18. **REST API:** Expose the dashboard server as an API for external tools.
+18. [x] **REST API:** Expose the dashboard server as an API for external tools.
 19. [x] **Slack/Teams Notifications:** Webhooks to notify teams when new cross-project leaks are detected.
 20. **Monorepo Support:** Specialized optimization and logic for massive monorepos (e.g., Lerna, Nx, Turborepo).
 21. **AI-Powered False Positive Detection:** Utilise LLMs to automatically analyze duplication contexts and automatically suggest hashes for whitelisting if they represent semantically diverse yet structurally similar boilerplate.
@@ -207,3 +208,4 @@ The following features are planned to further improve the utility:
 28. [x] **Real-time Code Quality Telemetry:** Stream duplication data continuously to Datadog or Prometheus (via `/metrics` endpoint).
 29. **Cross-Language Clone Detection:** Map abstract syntax trees across different languages (e.g. Java to C#) to identify structural patterns that cross language boundaries.
 30. **Automated Library Extraction:** Automatically generate scaffolding for a shared npm/pip/maven package when cross-project leakage exceeds a specific RefactorScore threshold.
+31. **Advanced Webhooks:** Per-project subscription webhooks to notify distinct teams of leakage specifically impacting their codebases.

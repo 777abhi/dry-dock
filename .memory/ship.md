@@ -47,3 +47,8 @@ Constraint: Complexity is computed strictly on a per-file basis during token tra
 Decision: Implement TelemetryExporter and transition monolithic `http.createServer` if/else logic into a mapped `routes` dictionary.
 Reasoning: To support observability (#28), a `/metrics` endpoint serving Prometheus text format was needed. Adding this exposed the fragility and unmaintainability of the existing server routing. Evolving to a dictionary-based route handler elegantly decouples endpoints, obeying Open/Closed principles for future API additions.
 Constraint: Ensure all existing dashboard endpoints (like `/api/diff` and `/api/code`) map correctly to the new `RouteHandler` signature, which now explicitly parses and provides `url.URL`.
+
+## 2026-03-10 - [REST API Mode]
+Decision: Implement `--api-only` flag and inject fully permissive CORS headers into the HTTP server response lifecycle.
+Reasoning: To support external tool integration as per roadmap feature #18, the dashboard server needed to be able to run silently (without an initial scan or opening the dashboard) and handle cross-origin requests. Adding CORS headers centrally in the server handler avoids repetition.
+Constraint: All new endpoints must pass through the main request handler to receive CORS headers automatically.

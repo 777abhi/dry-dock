@@ -616,6 +616,7 @@ async function main() {
 
     const failOnLeaks = args.includes('--fail');
     const shouldOpen = args.includes('--open') || args.length === 0;
+    const isApiOnly = args.includes('--api-only');
 
     // Collect paths to scan
     const scanArgs = args.filter((arg, index) => {
@@ -631,7 +632,7 @@ async function main() {
     };
 
     // If paths provided, run immediate scan
-    if (scanArgs.length > 0) {
+    if (scanArgs.length > 0 && !isApiOnly) {
         console.log('Scanning paths:', scanArgs);
         try {
             currentReport = await executeScan(scanArgs, currentCliOptions);
@@ -702,16 +703,31 @@ async function main() {
             console.error('Scan failed:', e);
             process.exit(1);
         }
+    } else if (isApiOnly) {
+        console.log('Launching in API-only mode (--api-only). Skipping initial scan.');
     } else {
         console.log('No paths provided. Launching in interactive mode.');
     }
 
-    if (shouldOpen || scanArgs.length === 0) {
+    if (shouldOpen || scanArgs.length === 0 || isApiOnly) {
         const initialPort = process.env.PORT !== undefined ? parseInt(process.env.PORT, 10) : 3000;
 
         type RouteHandler = (req: http.IncomingMessage, res: http.ServerResponse, parsedUrl: url.URL) => Promise<void> | void;
 
+        const setCorsHeaders = (res: http.ServerResponse) => {
+            res.setHeader('Access-Control-Allow-Origin', '*');
+            res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, DELETE');
+            res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+        };
+
         const routes: Record<string, Record<string, RouteHandler>> = {
+            'OPTIONS': {
+                '*': (req, res) => {
+                    setCorsHeaders(res);
+                    res.writeHead(204);
+                    res.end();
+                }
+            },
             'GET': {
                 '/': (req, res) => {
                     res.writeHead(200, { 'Content-Type': 'text/html' });
@@ -902,6 +918,18 @@ async function main() {
             const parsedUrl = new URL(req.url || '', `http://localhost:${actualPort}`);
             const method = req.method || 'GET';
             const pathname = parsedUrl.pathname;
+
+            setCorsHeaders(res);
+
+            if (method === 'OPTIONS') {
+                if (routes['OPTIONS'] && routes['OPTIONS']['*']) {
+                    await routes['OPTIONS']['*'](req, res, parsedUrl);
+                } else {
+                    res.writeHead(204);
+                    res.end();
+                }
+                return;
+            }
 
             const methodRoutes = routes[method];
             if (methodRoutes && methodRoutes[pathname]) {
