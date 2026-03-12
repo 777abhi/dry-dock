@@ -57,3 +57,8 @@ Constraint: All new endpoints must pass through the main request handler to rece
 Decision: Implement Multi-threaded scanning using Node.js `worker_threads` and a chunking mechanism.
 Reasoning: To fulfill roadmap feature #10 "Multi-threaded scanning for large repositories to improve performance." Offloading CPU-bound tasks (tokenisation and hashing) to worker threads significantly reduces execution time on large codebases.
 Constraint: Ensure the worker initialization correctly passes TS-Node execution arguments (`execArgv`) when running in development environments, and robustly handles un-compileable file paths to avoid silent thread failures.
+
+## 2026-03-12 - [Advanced Webhooks]
+Decision: Implement Advanced Webhooks (#31) and refactor the HTTP request logic in `src/notifier.ts` to be reusable.
+Reasoning: To support per-project subscription webhooks to notify distinct teams of leakage specifically impacting their codebases.
+Constraint: Ensure that notifications are only sent to specific project webhooks if there's actual leakage for that project.

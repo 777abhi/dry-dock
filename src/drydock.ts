@@ -10,7 +10,7 @@ import { getGitInfo } from './git-utils';
 import { DryDockReport, InternalDuplicate, CrossProjectLeakage, Occurrence } from './types';
 import { exportToCSV, exportToJUnit, exportToHTML } from './reporter';
 import { analyzeTrend, TrendResult } from './trend';
-import { WebhookNotifier } from './notifier';
+import { WebhookNotifier, ProjectWebhookNotifier } from './notifier';
 import { DiffService } from './diff-viewer';
 import { LanguageRegistry } from './language-registry';
 import { TelemetryExporter } from './telemetry';
@@ -642,6 +642,14 @@ async function main() {
     if (webhookIndex !== -1 && args[webhookIndex + 1]) {
         webhookUrl = args[webhookIndex + 1];
     }
+
+    // Parse project webhooks
+    const projectWebhooksIndex = args.indexOf('--project-webhooks');
+    let projectWebhooksFile: string | null = null;
+    if (projectWebhooksIndex !== -1 && args[projectWebhooksIndex + 1]) {
+        projectWebhooksFile = args[projectWebhooksIndex + 1];
+    }
+
     if (whitelistIndex !== -1 && args[whitelistIndex + 1]) {
         whitelistFile = args[whitelistIndex + 1];
     }
@@ -713,6 +721,24 @@ async function main() {
                     console.log('Webhook notification sent successfully.');
                 } catch (err: any) {
                     console.error('Failed to send webhook notification:', err.message);
+                }
+            }
+
+            if (projectWebhooksFile) {
+                const projectWebhooksPath = path.resolve(process.cwd(), projectWebhooksFile);
+                if (fs.existsSync(projectWebhooksPath)) {
+                    try {
+                        const content = fs.readFileSync(projectWebhooksPath, 'utf-8');
+                        const projectWebhooksMap = JSON.parse(content);
+                        console.log(`Sending project-specific webhook notifications...`);
+                        const projectNotifier = new ProjectWebhookNotifier(projectWebhooksMap);
+                        await projectNotifier.notify(currentReport);
+                        console.log('Project-specific webhook notifications sent successfully.');
+                    } catch (err: any) {
+                        console.error('Failed to parse or send project webhooks:', err.message);
+                    }
+                } else {
+                    console.warn(`Project webhooks file not found at: ${projectWebhooksPath}`);
                 }
             }
 

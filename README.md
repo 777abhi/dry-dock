@@ -77,6 +77,7 @@ You can point to different project folder locations using relative or absolute p
 | `--whitelist <file>` | Path to a file containing duplicate hashes to ignore (defaults to `.drydockwhitelist`). |
 | `--compare <file>` | Path to a previous `drydock-report.json` to perform a trend analysis on new, resolved, and remaining leaks. |
 | `--webhook <url>` | URL to send a JSON POST request with the scan summary (e.g., for Slack/Teams integration). |
+| `--project-webhooks <file>` | Path to a JSON file containing a mapping of project names to webhook URLs to notify specific teams. |
 | `--language <.ext=format>` | Dynamically register custom file extensions and their corresponding tokenizer formats (e.g., `--language .ex=elixir`). |
 | `--api-only` | Starts the server in REST API mode with CORS headers without running an initial scan or opening the dashboard. |
 
@@ -208,4 +209,5 @@ The following features are planned to further improve the utility:
 28. [x] **Real-time Code Quality Telemetry:** Stream duplication data continuously to Datadog or Prometheus (via `/metrics` endpoint).
 29. **Cross-Language Clone Detection:** Map abstract syntax trees across different languages (e.g. Java to C#) to identify structural patterns that cross language boundaries.
 30. **Automated Library Extraction:** Automatically generate scaffolding for a shared npm/pip/maven package when cross-project leakage exceeds a specific RefactorScore threshold.
-31. **Advanced Webhooks:** Per-project subscription webhooks to notify distinct teams of leakage specifically impacting their codebases.
+31. [x] **Advanced Webhooks:** Per-project subscription webhooks to notify distinct teams of leakage specifically impacting their codebases.
+32. **GraphQL API Integration:** Expose DryDock metrics via a GraphQL API to allow complex querying of leakage data by external services.
