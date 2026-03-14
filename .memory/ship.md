@@ -67,3 +67,8 @@ Constraint: Ensure that notifications are only sent to specific project webhooks
 Decision: Integrate a `/api/graphql` endpoint alongside the existing REST API to support fine-grained querying.
 Reasoning: Exposing DryDock metrics via a GraphQL API allows external services to perform complex queries to retrieve exactly the data they need, satisfying roadmap feature #32. We used `graphql` natively to map our strongly typed structures.
 Constraint: Ensure the GraphQL schema directly maps onto existing `DryDockReport` types to avoid redundant type declaration logic.
+
+## 2026-03-14 - [Monorepo Support]
+Decision: Refactor `project-identifier.ts` to use a Strategy Pattern (`IProjectIdentifierStrategy`).
+Reasoning: The legacy implementation relied solely on the names of directories that contained `package.json` or `go.mod` files. In monorepos, this frequently resulted in collisions (e.g. `packages/api` vs `apps/api`), undermining the `RefactorScore` calculation. The Strategy Pattern decouples identification logic per package manager, making it trivial to extract explicit names.
+Constraint: Ensure file reading errors (e.g., malformed `package.json`) are caught cleanly so it can silently fall back to directory naming without crashing the scanner thread.

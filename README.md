@@ -198,8 +198,9 @@ The following features are planned to further improve the utility:
 17. **Docker Support:** Official Docker image for easy deployment in containerized environments.
 18. [x] **REST API:** Expose the dashboard server as an API for external tools. Include a GraphQL endpoint (`/api/graphql`) for fine-grained querying.
 19. [x] **Slack/Teams Notifications:** Webhooks to notify teams when new cross-project leaks are detected.
-20. **Monorepo Support:** Specialized optimization and logic for massive monorepos (e.g., Lerna, Nx, Turborepo).
+20. [x] **Monorepo Support:** Specialized optimization and logic for massive monorepos (e.g., Lerna, Nx, Turborepo).
 21. **AI-Powered False Positive Detection:** Utilise LLMs to automatically analyze duplication contexts and automatically suggest hashes for whitelisting if they represent semantically diverse yet structurally similar boilerplate.
+34. **Semantic Merge Assistant:** Generate semantic diffs between structurally similar, un-whitelisted files, to assist developers in abstracting and merging duplicate files into shared libraries or components.
 22. [x] **Trend Visualisation in Dashboard:** Add historical trend graphs to the dashboard to visualise RefactorScore changes over time.
 23. [x] **Code Smells & Complexity Integration:** Incorporate Cyclomatic Complexity metrics and code smell analysis directly into the Code Inspector to guide deeper refactoring.
 24. [x] **Server Test Reliability:** Introduce random or dynamically allocated ports for local testing to avoid port collisions when testing the interactive dashboard and its APIs.
