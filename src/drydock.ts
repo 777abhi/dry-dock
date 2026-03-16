@@ -9,6 +9,7 @@ import { getIgnorePatterns } from './utils';
 import { getGitInfo } from './git-utils';
 import { DryDockReport, InternalDuplicate, CrossProjectLeakage, Occurrence } from './types';
 import { exportToCSV, exportToJUnit, exportToHTML, exportToMermaid } from './reporter';
+import { getCodeOwners } from './codeowners';
 import { analyzeTrend, TrendResult } from './trend';
 import { WebhookNotifier, ProjectWebhookNotifier } from './notifier';
 import { DiffService } from './diff-viewer';
@@ -356,7 +357,8 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
                         <div class="text-sm text-gray-600 mt-2">
                              Complexity: <span class="font-bold text-yellow-600">\${item.complexity}</span> | Found in: \${item.occurrences.map(o => {
                                  const meta = o.author ? \` title="Last modified by \${escapeHtml(o.author)} on \${o.date}"\` : '';
-                                 return \`<code class="bg-gray-100 px-1 py-0.5 rounded text-xs cursor-help"\${meta}>\${escapeHtml(o.file)}</code>\`;
+                                 const ownerBadge = o.owners && o.owners.length > 0 ? \` <span class="bg-purple-100 text-purple-800 text-[10px] px-1 rounded ml-1">\${escapeHtml(o.owners.join(', '))}</span>\` : '';
+                                 return \`<span class="inline-flex items-center"><code class="bg-gray-100 px-1 py-0.5 rounded text-xs cursor-help"\${meta}>\${escapeHtml(o.file)}</code>\${ownerBadge}</span>\`;
                              }).join(', ')}
                         </div>
                     </div>
@@ -615,9 +617,11 @@ async function executeScan(paths: string[], options: ScanOptions): Promise<DryDo
         const enrichedOccurrences = data.occurrences.map(occ => {
             const fullPath = path.resolve(process.cwd(), occ.file);
             const gitInfo = getGitInfo(fullPath);
+            const owners = getCodeOwners(fullPath);
             return {
                 ...occ,
-                ...(gitInfo && { author: gitInfo.author, date: gitInfo.date })
+                ...(gitInfo && { author: gitInfo.author, date: gitInfo.date }),
+                ...(owners && owners.length > 0 && { owners })
             };
         });
 

@@ -3,6 +3,7 @@ export interface Occurrence {
     file: string;
     author?: string;
     date?: string;
+    owners?: string[];
 }
 
 export interface InternalDuplicate {
