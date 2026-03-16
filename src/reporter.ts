@@ -88,3 +88,49 @@ export function exportToHTML(report: DryDockReport, template: string): string {
 
     return template.replace(/loadData\s*=\s*async\s*\(\)\s*=>\s*\{[\s\S]*?\};/, replacement);
 }
+
+export function exportToMermaid(report: DryDockReport): string {
+    const lines = ['graph TD'];
+    const nodes = new Set<string>();
+    const edges = new Map<string, number>();
+
+    const sanitizeId = (name: string) => name.replace(/[^a-zA-Z0-9]/g, '_');
+
+    report.cross_project_leakage.forEach(leak => {
+        // Create an edge for every unique pair of projects in this leak
+        for (let i = 0; i < leak.projects.length; i++) {
+            for (let j = i + 1; j < leak.projects.length; j++) {
+                const p1 = leak.projects[i];
+                const p2 = leak.projects[j];
+
+                // Add to nodes set to ensure we declare them with clean names later
+                nodes.add(p1);
+                nodes.add(p2);
+
+                const sourceId = sanitizeId(p1);
+                const targetId = sanitizeId(p2);
+
+                // Sort to ensure undirected representation if we want,
+                // but TD implies directed, so let's just use alphabetical order for consistency
+                const [a, b] = sourceId < targetId ? [sourceId, targetId] : [targetId, sourceId];
+
+                const edgeKey = `${a}:::${b}`;
+                const currentWeight = edges.get(edgeKey) || 0;
+                edges.set(edgeKey, currentWeight + leak.lines);
+            }
+        }
+    });
+
+    // Add node definitions
+    nodes.forEach(project => {
+        lines.push(`    ${sanitizeId(project)}["${project}"]`);
+    });
+
+    // Add edges
+    edges.forEach((weight, edgeKey) => {
+        const [source, target] = edgeKey.split(':::');
+        lines.push(`    ${source} -->|${weight} lines| ${target}`);
+    });
+
+    return lines.join('\n');
+}

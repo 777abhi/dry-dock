@@ -8,7 +8,7 @@ import { scanFile } from './scanner';
 import { getIgnorePatterns } from './utils';
 import { getGitInfo } from './git-utils';
 import { DryDockReport, InternalDuplicate, CrossProjectLeakage, Occurrence } from './types';
-import { exportToCSV, exportToJUnit, exportToHTML } from './reporter';
+import { exportToCSV, exportToJUnit, exportToHTML, exportToMermaid } from './reporter';
 import { analyzeTrend, TrendResult } from './trend';
 import { WebhookNotifier, ProjectWebhookNotifier } from './notifier';
 import { DiffService } from './diff-viewer';
@@ -63,6 +63,11 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
                 <div id="matrix-container">
                     <!-- Matrix will be rendered here -->
                 </div>
+
+                <h2 class="text-xl font-bold mt-8 mb-4 text-gray-800">Dependency Graph</h2>
+                <div id="graph-container" class="w-full flex justify-center mt-4">
+                    <!-- Graph will be rendered here -->
+                </div>
             </div>
 
             <!-- Cross-Project Leakage List -->
@@ -92,7 +97,17 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
         </div>
     </div>
 
-    <script>
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        mermaid.initialize({ startOnLoad: true });
+
+        // Attach functions to window so they can be called from HTML onclick attributes
+        window.browseFolder = browseFolder;
+        window.triggerScan = triggerScan;
+        window.cancelScan = cancelScan;
+        window.inspectClone = inspectClone;
+        window.closeInspector = closeInspector;
+
         async function browseFolder() {
              try {
                  const response = await fetch('/api/browse');
@@ -169,13 +184,13 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
             }
         }
 
-        function renderReport(report, trend = null) {
+        async function renderReport(report, trend = null) {
             reportData = report;
             document.getElementById('results-container').classList.remove('hidden');
             document.getElementById('empty-state').classList.add('hidden');
             
             renderStats(report);
-            renderMatrix(report);
+            await renderMatrix(report);
             renderLeakage(report);
             if (trend && trend.scoreChange !== undefined) {
                 renderTrend(trend);
@@ -215,7 +230,7 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
                 \`Found \${crossCount} cross-project leaks & \${internalCount} internal duplicates\`;
         }
 
-        function renderMatrix(report) {
+        async function renderMatrix(report) {
             // Extract all unique projects from cross_project_leakage
             const projects = new Set();
             report.cross_project_leakage.forEach(item => {
@@ -267,6 +282,66 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
             html += '</tbody></table>';
 
             document.getElementById('matrix-container').innerHTML = html;
+
+            // Render Mermaid Graph
+            if (report.cross_project_leakage.length > 0) {
+                const nodes = new Set();
+                const edges = new Map();
+
+                const sanitizeId = (name) => name.replace(/[^a-zA-Z0-9]/g, '_');
+
+                report.cross_project_leakage.forEach(leak => {
+                    for (let i = 0; i < leak.projects.length; i++) {
+                        for (let j = i + 1; j < leak.projects.length; j++) {
+                            const p1 = leak.projects[i];
+                            const p2 = leak.projects[j];
+
+                            nodes.add(p1);
+                            nodes.add(p2);
+
+                            const sourceId = sanitizeId(p1);
+                            const targetId = sanitizeId(p2);
+
+                            const [a, b] = sourceId < targetId ? [sourceId, targetId] : [targetId, sourceId];
+
+                            const edgeKey = \`\${a}:::\${b}\`;
+                            const currentWeight = edges.get(edgeKey) || 0;
+                            edges.set(edgeKey, currentWeight + leak.lines);
+                        }
+                    }
+                });
+
+                let mermaidDef = 'graph TD\\n';
+                nodes.forEach(project => {
+                    mermaidDef += \`    \${sanitizeId(project)}["\${project}"]\\n\`;
+                });
+                edges.forEach((weight, edgeKey) => {
+                    const [source, target] = edgeKey.split(':::');
+                    mermaidDef += \`    \${source} -->|\${weight} lines| \${target}\\n\`;
+                });
+
+                const graphContainer = document.getElementById('graph-container');
+
+                // Clear the container first in case of re-render
+                graphContainer.innerHTML = '';
+
+                // create a pre element with the mermaid class
+                const graphEl = document.createElement('pre');
+                graphEl.className = 'mermaid text-sm';
+                graphEl.textContent = mermaidDef;
+
+                graphContainer.appendChild(graphEl);
+
+                try {
+                    await mermaid.run({
+                        nodes: [graphEl]
+                    });
+                } catch (e) {
+                    console.error('Mermaid rendering failed', e);
+                }
+            } else {
+                document.getElementById('graph-container').innerHTML = '<p class="text-gray-500 italic">No cross-project dependencies to map.</p>';
+            }
         }
 
         function renderLeakage(report) {
@@ -382,7 +457,7 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
                  }
 
                  if (reportData && (reportData.cross_project_leakage.length > 0 || reportData.internal_duplicates.length > 0)) {
-                     renderReport(reportData, trendData);
+                     await renderReport(reportData, trendData);
                  }
              } catch (error) {
                  console.error('Failed to load updated report data', error);
@@ -708,6 +783,10 @@ async function main() {
                     case 'html':
                         fs.writeFileSync('drydock-report.html', exportToHTML(currentReport, DASHBOARD_HTML));
                         console.log('Report saved to drydock-report.html');
+                        break;
+                    case 'mermaid':
+                        fs.writeFileSync('drydock-report.mmd', exportToMermaid(currentReport));
+                        console.log('Report saved to drydock-report.mmd');
                         break;
                     default:
                         console.warn(`Unknown format: ${format}`);

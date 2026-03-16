@@ -193,7 +193,7 @@ The following features are planned to further improve the utility:
 12. **IDE Extensions:** Plugins for VS Code and IntelliJ to highlight duplicates in the editor.
 13. **Dependency Analysis:** Flag duplicates that match known open-source libraries.
 14. **Auto-Refactor Suggestions:** Generate boilerplate for extracting duplicates into a shared library.
-15. **Graph Visualization:** Node-link diagram showing dependency relationships between projects based on leaks.
+15. [x] **Graph Visualization:** Node-link diagram showing dependency relationships between projects based on leaks.
 16. [x] **Whitelisting:** Ability to mark specific duplicates as "accepted" or "false positive".
 17. **Docker Support:** Official Docker image for easy deployment in containerized environments.
 18. [x] **REST API:** Expose the dashboard server as an API for external tools. Include a GraphQL endpoint (`/api/graphql`) for fine-grained querying.
@@ -213,3 +213,4 @@ The following features are planned to further improve the utility:
 31. [x] **Advanced Webhooks:** Per-project subscription webhooks to notify distinct teams of leakage specifically impacting their codebases.
 32. [x] **GraphQL API Integration:** Expose DryDock metrics via a GraphQL API to allow complex querying of leakage data by external services.
 33. **Multi-Region Distributed Scanning:** Distribute massive repository tokenisation workloads across multiple nodes to handle enterprise-scale source code scanning in parallel.
+35. **Code Owner Integration:** Automatically look up `CODEOWNERS` files in identified projects and annotate the leakage reports with the responsible teams.
