@@ -1,10 +1,10 @@
 import { DryDockReport, CrossProjectLeakage } from './types';
 
 export interface TrendResult {
-    newLeaks: CrossProjectLeakage[];
-    resolvedLeaks: CrossProjectLeakage[];
-    remainingLeaks: CrossProjectLeakage[];
-    scoreChange: number;
+    new_leaks: CrossProjectLeakage[];
+    resolved_leaks: CrossProjectLeakage[];
+    remaining_leaks: CrossProjectLeakage[];
+    score_change: number;
 }
 
 export function analyzeTrend(oldReport: DryDockReport, newReport: DryDockReport): TrendResult {
@@ -24,30 +24,30 @@ export function analyzeTrend(oldReport: DryDockReport, newReport: DryDockReport)
         newScore += leak.score;
     }
 
-    const newLeaks: CrossProjectLeakage[] = [];
-    const remainingLeaks: CrossProjectLeakage[] = [];
-    const resolvedLeaks: CrossProjectLeakage[] = [];
+    const new_leaks: CrossProjectLeakage[] = [];
+    const remaining_leaks: CrossProjectLeakage[] = [];
+    const resolved_leaks: CrossProjectLeakage[] = [];
 
     // Identify new and remaining
     for (const [hash, leak] of newLeaksMap.entries()) {
         if (oldLeaksMap.has(hash)) {
-            remainingLeaks.push(leak);
+            remaining_leaks.push(leak);
         } else {
-            newLeaks.push(leak);
+            new_leaks.push(leak);
         }
     }
 
     // Identify resolved
     for (const [hash, leak] of oldLeaksMap.entries()) {
         if (!newLeaksMap.has(hash)) {
-            resolvedLeaks.push(leak);
+            resolved_leaks.push(leak);
         }
     }
 
     return {
-        newLeaks,
-        resolvedLeaks,
-        remainingLeaks,
-        scoreChange: newScore - oldScore
+        new_leaks,
+        resolved_leaks,
+        remaining_leaks,
+        score_change: newScore - oldScore
     };
 }

@@ -78,3 +78,13 @@ Constraint: Ensure file reading errors (e.g., malformed `package.json`) are caug
 Decision: Introduced official Docker containerization support (`Dockerfile` & `.dockerignore`) and bypassed real daemon build commands in the test suite.
 Reasoning: Fulfilling roadmap feature #17 to allow easy deployment in CI/CD and containerized environments without global environment dependencies like Node/npm on the host system. Test invocation of `docker build` failed due to underlying constraints in test sandboxing, so we instead validate dockerfile configurations.
 Constraint: When writing tests for container operations in isolated sandboxes, rely on static configuration validation instead of full runtime `docker` CLI bindings unless fully supported by the daemon.
+
+## 2026-03-18 - [Automated Actionable PR Comments]
+Decision: Implement `GitHubPRNotifier` class implementing `INotifier` and triggered by `--pr-comment` flag, utilizing `GITHUB_TOKEN`, `GITHUB_REPOSITORY`, and `GITHUB_REF` environment variables.
+Reasoning: We needed to fulfill roadmap feature #26 to automatically post comments on Pull Requests for any new structural clones introduced in a commit. Using native `http`/`https` avoids introducing heavy GitHub client dependencies, and implementing `INotifier` keeps the codebase decoupled.
+Constraint: When using `http` or `https` built-ins, care must be taken to ensure they are stubbable during testing, either via dependency injection or via mock local servers, to avoid runtime errors when trying to mock read-only exported object properties like `https.request`.
+
+## 2026-03-18 - [Automated Actionable PR Comments Update]
+Decision: Update `GitHubPRNotifier` integration to only post when `--compare` is provided and there are new structural clones introduced.
+Reasoning: We needed to fulfill the code review requirement to make the PR comments "actionable", reporting only *new* structural clones introduced in the current commit rather than all pre-existing duplicates.
+Constraint: Ensure that `--compare` is present and successfully calculates `trendResult` before attempting to notify with a synthetic `DryDockReport` containing only `trendResult.new_leaks`.

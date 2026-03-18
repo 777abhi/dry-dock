@@ -217,7 +217,7 @@ The following features are planned to further improve the utility:
 23. [x] **Code Smells & Complexity Integration:** Incorporate Cyclomatic Complexity metrics and code smell analysis directly into the Code Inspector to guide deeper refactoring.
 24. [x] **Server Test Reliability:** Introduce random or dynamically allocated ports for local testing to avoid port collisions when testing the interactive dashboard and its APIs.
 25. **Export to PDF:** Allow exporting the current dashboard and leakage statistics to a PDF format to send reports directly to management or executives without requiring server access.
-26. **Automated Actionable PR Comments:** Automatically post comments on Pull Requests for any new structural clones introduced in a commit.
+26. [x] **Automated Actionable PR Comments:** Automatically post comments on Pull Requests for any new structural clones introduced in a commit.
 27. **Semantic Refactoring Prompts:** Generate refactoring instructions for developers based on the structural diff to make consolidating code easier.
 28. [x] **Real-time Code Quality Telemetry:** Stream duplication data continuously to Datadog or Prometheus (via `/metrics` endpoint).
 29. **Cross-Language Clone Detection:** Map abstract syntax trees across different languages (e.g. Java to C#) to identify structural patterns that cross language boundaries.
@@ -225,5 +225,6 @@ The following features are planned to further improve the utility:
 31. [x] **Advanced Webhooks:** Per-project subscription webhooks to notify distinct teams of leakage specifically impacting their codebases.
 32. [x] **GraphQL API Integration:** Expose DryDock metrics via a GraphQL API to allow complex querying of leakage data by external services.
 33. **Multi-Region Distributed Scanning:** Distribute massive repository tokenisation workloads across multiple nodes to handle enterprise-scale source code scanning in parallel.
-35. **Code Owner Integration:** Automatically look up `CODEOWNERS` files in identified projects and annotate the leakage reports with the responsible teams.
+35. [x] **Code Owner Integration:** Automatically look up `CODEOWNERS` files in identified projects and annotate the leakage reports with the responsible teams.
 36. **CI/CD Native Actions:** Create official GitHub Actions and GitLab CI components wrapping the Docker image to make pipeline integration entirely seamless.
+37. **Distributed Consensus Blacklisting:** Introduce an intelligent p2p voting network across dev machines where developers can globally vote to ban false positive boilerplate hashes.
