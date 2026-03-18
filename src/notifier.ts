@@ -93,3 +93,108 @@ export class ProjectWebhookNotifier implements INotifier {
         await Promise.all(promises);
     }
 }
+
+export class GitHubPRNotifier implements INotifier {
+    constructor(
+        private token: string,
+        private repo: string, // format: owner/repo
+        private prNumber: number
+    ) {}
+
+    async notify(report: DryDockReport): Promise<void> {
+        if (report.cross_project_leakage.length === 0) {
+            return;
+        }
+
+        const mdLines: string[] = [];
+        mdLines.push(`### ⚠️ DryDock detected ${report.cross_project_leakage.length} Cross-Project Leaks`);
+        mdLines.push('');
+        mdLines.push('| Hash | Score | Projects | Lines |');
+        mdLines.push('|------|-------|----------|-------|');
+
+        // Only take the top 10 highest scored
+        const topLeaks = [...report.cross_project_leakage]
+            .sort((a, b) => b.score - a.score)
+            .slice(0, 10);
+
+        for (const leak of topLeaks) {
+            const shortHash = leak.hash.substring(0, 8);
+            const scoreStr = leak.score.toFixed(2);
+            const projStr = leak.projects.join(', ');
+            mdLines.push(`| \`${shortHash}\` | **${scoreStr}** | ${projStr} | ${leak.lines} |`);
+        }
+
+        if (report.cross_project_leakage.length > 10) {
+             mdLines.push(`| ... | ... | *+${report.cross_project_leakage.length - 10} more* | ... |`);
+        }
+
+        mdLines.push('');
+        mdLines.push('Please review these structural clones and consider extracting them into a shared library.');
+
+        const payload = {
+            body: mdLines.join('\n')
+        };
+
+        const payloadStr = JSON.stringify(payload);
+
+        let hostname = 'api.github.com';
+        let isHttps = true;
+        let port = 443;
+
+        if (process.env.GITHUB_API_URL) {
+            try {
+                const parsedUrl = new URL(process.env.GITHUB_API_URL);
+                hostname = parsedUrl.hostname;
+                isHttps = parsedUrl.protocol === 'https:';
+                if (parsedUrl.port) {
+                    port = parseInt(parsedUrl.port, 10);
+                } else {
+                    port = isHttps ? 443 : 80;
+                }
+            } catch (e) {
+                // fallback if it's not a valid URL
+                hostname = process.env.GITHUB_API_URL;
+            }
+        }
+
+        // Allow explicit port override for testing
+        if (process.env.GITHUB_API_PORT) {
+            port = parseInt(process.env.GITHUB_API_PORT, 10);
+            isHttps = port === 443;
+        }
+
+        const requestModule = isHttps ? https : http;
+
+        const options = {
+            hostname,
+            port,
+            path: `/repos/${this.repo}/issues/${this.prNumber}/comments`,
+            method: 'POST',
+            headers: {
+                'Authorization': `token ${this.token}`,
+                'User-Agent': 'dry-dock',
+                'Accept': 'application/vnd.github.v3+json',
+                'Content-Type': 'application/json',
+                'Content-Length': Buffer.byteLength(payloadStr)
+            }
+        };
+
+        return new Promise((resolve, reject) => {
+            const req = requestModule.request(options, (res) => {
+                let body = '';
+                res.on('data', chunk => body += chunk);
+                res.on('end', () => {
+                    if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
+                        resolve();
+                    } else {
+                        reject(new Error(`GitHub API failed with status ${res.statusCode}: ${body}`));
+                    }
+                });
+            });
+
+            req.on('error', reject);
+            req.write(payloadStr);
+            req.end();
+        });
+    }
+}

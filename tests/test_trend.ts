@@ -34,23 +34,23 @@ function runTests() {
 
     const result: TrendResult = analyzeTrend(oldReport, newReport);
 
-    if (result.newLeaks.length !== 1 || result.newLeaks[0].hash !== 'hash3') {
-        console.error("FAIL: Expected 1 new leak (hash3), got:", result.newLeaks);
+    if (result.new_leaks.length !== 1 || result.new_leaks[0].hash !== 'hash3') {
+        console.error("FAIL: Expected 1 new leak (hash3), got:", result.new_leaks);
         process.exit(1);
     }
 
-    if (result.resolvedLeaks.length !== 1 || result.resolvedLeaks[0].hash !== 'hash2') {
-        console.error("FAIL: Expected 1 resolved leak (hash2), got:", result.resolvedLeaks);
+    if (result.resolved_leaks.length !== 1 || result.resolved_leaks[0].hash !== 'hash2') {
+        console.error("FAIL: Expected 1 resolved leak (hash2), got:", result.resolved_leaks);
         process.exit(1);
     }
 
-    if (result.remainingLeaks.length !== 1 || result.remainingLeaks[0].hash !== 'hash1') {
-        console.error("FAIL: Expected 1 remaining leak (hash1), got:", result.remainingLeaks);
+    if (result.remaining_leaks.length !== 1 || result.remaining_leaks[0].hash !== 'hash1') {
+        console.error("FAIL: Expected 1 remaining leak (hash1), got:", result.remaining_leaks);
         process.exit(1);
     }
 
-    if (result.scoreChange !== 150) { // New total (300) - Old total (150) = 150
-        console.error("FAIL: Expected scoreChange of 150, got:", result.scoreChange);
+    if (result.score_change !== 150) { // New total (300) - Old total (150) = 150
+        console.error("FAIL: Expected scoreChange of 150, got:", result.score_change);
         process.exit(1);
     }
 
@@ -122,7 +122,7 @@ async function testApiEndpoint() {
         });
 
         const parsed = JSON.parse(data);
-        if (!parsed.newLeaks || !parsed.resolvedLeaks || !parsed.remainingLeaks || parsed.scoreChange === undefined) {
+        if (!parsed.new_leaks || !parsed.resolved_leaks || !parsed.remaining_leaks || parsed.score_change === undefined) {
              console.error("FAIL: /api/trend endpoint returned invalid payload:", parsed);
              hasError = true;
         } else {

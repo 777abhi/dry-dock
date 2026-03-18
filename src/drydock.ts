@@ -11,7 +11,7 @@ import { DryDockReport, InternalDuplicate, CrossProjectLeakage, Occurrence } fro
 import { exportToCSV, exportToJUnit, exportToHTML, exportToMermaid } from './reporter';
 import { getCodeOwners } from './codeowners';
 import { analyzeTrend, TrendResult } from './trend';
-import { WebhookNotifier, ProjectWebhookNotifier } from './notifier';
+import { WebhookNotifier, ProjectWebhookNotifier, GitHubPRNotifier } from './notifier';
 import { DiffService } from './diff-viewer';
 import { LanguageRegistry } from './language-registry';
 import { TelemetryExporter } from './telemetry';
@@ -201,25 +201,25 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
         function renderTrend(trend) {
             document.getElementById('trend-section').classList.remove('hidden');
             const container = document.getElementById('trend-container');
-            const scoreColor = trend.scoreChange > 0 ? 'text-red-600' : (trend.scoreChange < 0 ? 'text-green-600' : 'text-gray-600');
-            const scoreSign = trend.scoreChange > 0 ? '+' : '';
+            const scoreColor = trend.score_change > 0 ? 'text-red-600' : (trend.score_change < 0 ? 'text-green-600' : 'text-gray-600');
+            const scoreSign = trend.score_change > 0 ? '+' : '';
 
             container.innerHTML = \`
                 <div class="p-4 bg-gray-50 rounded border text-center">
                     <div class="text-sm text-gray-500 uppercase tracking-wide">New Leaks</div>
-                    <div class="text-2xl font-bold text-red-600">\${trend.newLeaks.length}</div>
+                    <div class="text-2xl font-bold text-red-600">\${trend.new_leaks.length}</div>
                 </div>
                 <div class="p-4 bg-gray-50 rounded border text-center">
                     <div class="text-sm text-gray-500 uppercase tracking-wide">Resolved Leaks</div>
-                    <div class="text-2xl font-bold text-green-600">\${trend.resolvedLeaks.length}</div>
+                    <div class="text-2xl font-bold text-green-600">\${trend.resolved_leaks.length}</div>
                 </div>
                 <div class="p-4 bg-gray-50 rounded border text-center">
                     <div class="text-sm text-gray-500 uppercase tracking-wide">Remaining Leaks</div>
-                    <div class="text-2xl font-bold text-yellow-600">\${trend.remainingLeaks.length}</div>
+                    <div class="text-2xl font-bold text-yellow-600">\${trend.remaining_leaks.length}</div>
                 </div>
                 <div class="p-4 bg-gray-50 rounded border text-center">
                     <div class="text-sm text-gray-500 uppercase tracking-wide">Score Change</div>
-                    <div class="text-2xl font-bold \${scoreColor}">\${scoreSign}\${Math.round(trend.scoreChange)}</div>
+                    <div class="text-2xl font-bold \${scoreColor}">\${scoreSign}\${Math.round(trend.score_change)}</div>
                 </div>
             \`;
         }
@@ -730,6 +730,14 @@ async function main() {
         projectWebhooksFile = args[projectWebhooksIndex + 1];
     }
 
+    // Parse PR comment
+    const prComment = args.includes('--pr-comment');
+    const prNumberIndex = args.indexOf('--pr-number');
+    let explicitPrNumber: number | null = null;
+    if (prNumberIndex !== -1 && args[prNumberIndex + 1]) {
+        explicitPrNumber = parseInt(args[prNumberIndex + 1], 10);
+    }
+
     if (whitelistIndex !== -1 && args[whitelistIndex + 1]) {
         whitelistFile = args[whitelistIndex + 1];
     }
@@ -835,16 +843,48 @@ async function main() {
                         const trend: TrendResult = analyzeTrend(oldReport, currentReport);
                         currentTrendData = trend;
                         console.log('--- Trend Analysis ---');
-                        console.log(`New leaks introduced: ${trend.newLeaks.length}`);
-                        console.log(`Leaks resolved: ${trend.resolvedLeaks.length}`);
-                        console.log(`Leaks remaining: ${trend.remainingLeaks.length}`);
-                        console.log(`Total RefactorScore change: ${trend.scoreChange > 0 ? '+' : ''}${Math.round(trend.scoreChange)}`);
+                        console.log(`New leaks introduced: ${trend.new_leaks.length}`);
+                        console.log(`Leaks resolved: ${trend.resolved_leaks.length}`);
+                        console.log(`Leaks remaining: ${trend.remaining_leaks.length}`);
+                        console.log(`Total RefactorScore change: ${trend.score_change > 0 ? '+' : ''}${Math.round(trend.score_change)}`);
                         console.log('----------------------\n');
                     } catch (err) {
                         console.warn('Failed to parse old report for comparison:', err);
                     }
                 } else {
                     console.warn(`Comparison report not found at: ${comparePath}`);
+                }
+            }
+
+            if (prComment) {
+                const token = process.env.GITHUB_TOKEN;
+                const repo = process.env.GITHUB_REPOSITORY;
+                let prNum: number | null = explicitPrNumber;
+
+                if (!prNum && process.env.GITHUB_REF) {
+                    const match = process.env.GITHUB_REF.match(/refs\/pull\/(\d+)\/(merge|head)/);
+                    if (match) {
+                        prNum = parseInt(match[1], 10);
+                    }
+                }
+
+                if (!token || !repo || !prNum) {
+                    console.error('Error posting PR comment: GITHUB_TOKEN, GITHUB_REPOSITORY, and PR number (via GITHUB_REF or --pr-number) must be set.');
+                } else if (!currentTrendData) {
+                    console.warn('Skipping PR comment: No trend analysis available (use --compare) to identify new leaks.');
+                } else {
+                    console.log(`Posting DryDock report of *new leaks* to PR ${repo}#${prNum}...`);
+                    const prNotifier = new GitHubPRNotifier(token, repo, prNum);
+                    try {
+                        const newLeaksReport: DryDockReport = {
+                            internal_duplicates: [], // We only post cross-project leaks
+                            cross_project_leakage: currentTrendData.new_leaks
+                        };
+                        await prNotifier.notify(newLeaksReport);
+                        console.log('PR comment posted successfully.');
+                    } catch (e: any) {
+                        console.error(`Error posting PR comment: ${e.message}`);
+                    }
                 }
             }
 
