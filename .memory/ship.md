@@ -88,3 +88,8 @@ Constraint: When using `http` or `https` built-ins, care must be taken to ensure
 Decision: Update `GitHubPRNotifier` integration to only post when `--compare` is provided and there are new structural clones introduced.
 Reasoning: We needed to fulfill the code review requirement to make the PR comments "actionable", reporting only *new* structural clones introduced in the current commit rather than all pre-existing duplicates.
 Constraint: Ensure that `--compare` is present and successfully calculates `trendResult` before attempting to notify with a synthetic `DryDockReport` containing only `trendResult.new_leaks`.
+
+## 2026-03-20 - [Automated Library Extraction]
+Decision: Introduced `LibraryExtractor` logic to automatically scaffold a basic npm package (`package.json` + code) when cross-project leakage exceeds a specific RefactorScore threshold (`--extract-threshold`).
+Reasoning: We needed to fulfill roadmap feature #30. Providing automatic boilerplate significantly reduces the friction of migrating highly-leaked code into shared libraries. A separate `LibraryExtractor` class was created to keep extraction logic out of the core scanner path.
+Constraint: For testing environments, file path resolution when copying the source file to `index.js` must handle mocked files robustly without crashing.

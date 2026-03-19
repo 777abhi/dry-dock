@@ -16,6 +16,7 @@ import { DiffService } from './diff-viewer';
 import { LanguageRegistry } from './language-registry';
 import { TelemetryExporter } from './telemetry';
 import { executeGraphQL } from './graphql';
+import { LibraryExtractor } from './library-extractor';
 import { Worker } from 'worker_threads';
 import * as os from 'os';
 
@@ -676,6 +677,19 @@ async function main() {
         minLines = parseInt(args[minLinesIndex + 1], 10);
     }
 
+    // Parse extract threshold and dir
+    const extractThresholdIndex = args.indexOf('--extract-threshold');
+    let extractThreshold: number | null = null;
+    if (extractThresholdIndex !== -1 && args[extractThresholdIndex + 1]) {
+        extractThreshold = parseFloat(args[extractThresholdIndex + 1]);
+    }
+
+    const extractDirIndex = args.indexOf('--extract-dir');
+    let extractDir = 'extracted-libs';
+    if (extractDirIndex !== -1 && args[extractDirIndex + 1]) {
+        extractDir = args[extractDirIndex + 1];
+    }
+
     // Parse ignore options from cli if any (hacky, ideally use commander or similar)
     const ignoreIndex = args.indexOf('--ignore');
     let cliIgnore: string[] = [];
@@ -886,6 +900,12 @@ async function main() {
                         console.error(`Error posting PR comment: ${e.message}`);
                     }
                 }
+            }
+
+            if (extractThreshold !== null) {
+                console.log(`\nExtracting libraries with RefactorScore >= ${extractThreshold}...`);
+                const extractor = new LibraryExtractor();
+                extractor.extract(currentReport, extractThreshold, extractDir);
             }
 
             const crossCount = currentReport.cross_project_leakage.length;

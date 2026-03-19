@@ -221,10 +221,11 @@ The following features are planned to further improve the utility:
 27. **Semantic Refactoring Prompts:** Generate refactoring instructions for developers based on the structural diff to make consolidating code easier.
 28. [x] **Real-time Code Quality Telemetry:** Stream duplication data continuously to Datadog or Prometheus (via `/metrics` endpoint).
 29. **Cross-Language Clone Detection:** Map abstract syntax trees across different languages (e.g. Java to C#) to identify structural patterns that cross language boundaries.
-30. **Automated Library Extraction:** Automatically generate scaffolding for a shared npm/pip/maven package when cross-project leakage exceeds a specific RefactorScore threshold.
+30. [x] **Automated Library Extraction:** Automatically generate scaffolding for a shared npm/pip/maven package when cross-project leakage exceeds a specific RefactorScore threshold.
 31. [x] **Advanced Webhooks:** Per-project subscription webhooks to notify distinct teams of leakage specifically impacting their codebases.
 32. [x] **GraphQL API Integration:** Expose DryDock metrics via a GraphQL API to allow complex querying of leakage data by external services.
 33. **Multi-Region Distributed Scanning:** Distribute massive repository tokenisation workloads across multiple nodes to handle enterprise-scale source code scanning in parallel.
 35. [x] **Code Owner Integration:** Automatically look up `CODEOWNERS` files in identified projects and annotate the leakage reports with the responsible teams.
 36. **CI/CD Native Actions:** Create official GitHub Actions and GitLab CI components wrapping the Docker image to make pipeline integration entirely seamless.
 37. **Distributed Consensus Blacklisting:** Introduce an intelligent p2p voting network across dev machines where developers can globally vote to ban false positive boilerplate hashes.
+38. **Automatic License Inference:** Use ASTs and metadata to automatically infer and append the most likely matching Open Source License to extracted automated libraries.
