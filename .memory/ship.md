@@ -98,3 +98,8 @@ Constraint: For testing environments, file path resolution when copying the sour
 Decision: Added `inferLicense` method to `LibraryExtractor` to automatically detect licenses from source code.
 Reasoning: To meet roadmap feature #38, extracted libraries should retain their original open-source license intents instead of hardcoding 'ISC'. This helps avoid compliance issues when consolidating code.
 Constraint: File content must be read dynamically prior to generation of `package.json` to infer the license properly, requiring fallback logic for resolving mocked file paths during testing.
+
+## 2026-03-22 - [Automated Vulnerability Scanning]
+Decision: Integrated `scanForVulnerabilities` method within `LibraryExtractor` to prevent extraction of known insecure code.
+Reasoning: To meet roadmap feature #39, code shouldn't be automatically distributed as a shared package if it contains simple known vulnerabilities like `eval` or hardcoded secrets. We shifted file content loading earlier in the loop to support this.
+Constraint: Must ensure file reading logic dynamically resolves the mocked path correctly during testing so the static analysis can examine the proper file content without breaking extraction flow.
