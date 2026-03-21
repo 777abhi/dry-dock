@@ -12,11 +12,13 @@ if (!fs.existsSync(testDir)) {
 const sourceFile1 = path.join(testDir, 'source1.js');
 const sourceFile2 = path.join(testDir, 'source2.js');
 const sourceFile3 = path.join(testDir, 'source3.js');
+const sourceVuln = path.join(testDir, 'source_vuln.js');
 const outputDir = path.join(testDir, 'output');
 
 fs.writeFileSync(sourceFile1, '/* MIT License */\nconsole.log("duplicate code");');
 fs.writeFileSync(sourceFile2, '/* Apache License 2.0 */\nconsole.log("duplicate code");');
 fs.writeFileSync(sourceFile3, 'console.log("duplicate code");');
+fs.writeFileSync(sourceVuln, 'eval("console.log(\'bad\');");');
 
 const mockReport: DryDockReport = {
     internal_duplicates: [],
@@ -59,6 +61,19 @@ const mockReport: DryDockReport = {
                 { file: sourceFile2, project: 'projE' },
                 { file: sourceFile2, project: 'projF' }
             ]
+        },
+        {
+            hash: 'mockhashvuln123',
+            lines: 10,
+            complexity: 2,
+            frequency: 2,
+            spread: 2,
+            score: 100, // Meets threshold of 50
+            projects: ['projG', 'projH'],
+            occurrences: [
+                { file: sourceVuln, project: 'projG' },
+                { file: sourceVuln, project: 'projH' }
+            ]
         }
     ]
 };
@@ -92,6 +107,9 @@ try {
 
     const notExtractedDir = path.join(outputDir, 'shared-lib-mockhash456');
     assert.strictEqual(fs.existsSync(notExtractedDir), false, 'Directory should not exist for score < threshold');
+
+    const vulnExtractedDir = path.join(outputDir, 'shared-lib-mockhashvuln123');
+    assert.strictEqual(fs.existsSync(vulnExtractedDir), false, 'Directory should not exist for vulnerable code even if score >= threshold');
 
     console.log('PASS: Automated Library Extraction logic verified.');
 } catch (e) {

@@ -3,6 +3,20 @@ import * as path from 'path';
 import { DryDockReport, CrossProjectLeakage } from './types';
 
 export class LibraryExtractor {
+    private scanForVulnerabilities(content: string): string[] {
+        const vulnerabilities: string[] = [];
+        if (/\beval\s*\(/.test(content)) {
+            vulnerabilities.push('Use of eval() detected.');
+        }
+        if (/\bexec\s*\(/.test(content)) {
+            vulnerabilities.push('Use of child_process.exec() detected.');
+        }
+        if (/(password|secret|token)\s*=\s*['"][^'"]+['"]/i.test(content)) {
+            vulnerabilities.push('Hardcoded secrets detected.');
+        }
+        return vulnerabilities;
+    }
+
     private inferLicense(content: string): string {
         const text = content.toLowerCase();
         if (text.includes('mit license') || text.includes('license: mit')) {
@@ -40,6 +54,27 @@ export class LibraryExtractor {
         for (const candidate of candidates) {
             if (candidate.occurrences.length === 0) continue;
 
+            const sourceOccurrence = candidate.occurrences[0];
+            const sourceFile = typeof sourceOccurrence === 'string' ? sourceOccurrence : sourceOccurrence.file;
+            const fullSourcePath = path.resolve(process.cwd(), sourceFile);
+
+            let content = '';
+            let fileToRead = '';
+            if (fs.existsSync(fullSourcePath)) {
+                fileToRead = fullSourcePath;
+            } else if (fs.existsSync(sourceFile)) {
+                fileToRead = sourceFile;
+            }
+
+            if (fileToRead) {
+                content = fs.readFileSync(fileToRead, 'utf8');
+                const vulnerabilities = this.scanForVulnerabilities(content);
+                if (vulnerabilities.length > 0) {
+                    console.warn(`Skipping extraction for hash ${candidate.hash} due to detected vulnerabilities: ${vulnerabilities.join(' ')}`);
+                    continue;
+                }
+            }
+
             const libName = `shared-lib-${candidate.hash.substring(0, 12)}`;
             const libDir = path.join(outputDir, libName);
 
@@ -48,18 +83,13 @@ export class LibraryExtractor {
             }
 
             // Copy source file to index.js
-            const sourceOccurrence = candidate.occurrences[0];
-            const sourceFile = typeof sourceOccurrence === 'string' ? sourceOccurrence : sourceOccurrence.file;
-            const fullSourcePath = path.resolve(process.cwd(), sourceFile);
-
             let license = 'ISC';
+            if (content) {
+                license = this.inferLicense(content);
+            }
+
             if (fs.existsSync(fullSourcePath)) {
-                const content = fs.readFileSync(fullSourcePath, 'utf8');
-                license = this.inferLicense(content);
                 fs.copyFileSync(fullSourcePath, path.join(libDir, 'index.js'));
-            } else if (fs.existsSync(sourceFile)) {
-                const content = fs.readFileSync(sourceFile, 'utf8');
-                license = this.inferLicense(content);
             }
 
             // Generate package.json
