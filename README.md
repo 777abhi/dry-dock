@@ -216,16 +216,18 @@ To demonstrate dry-dock's capabilities in a more realistic scenario, let's consi
 
 ## Dashboard Results
 
-Here is an example of the dry-dock dashboard visualizing the cross-project leakage between two mock applications:
+Here is a live scan of the `inventory-service` and `order-service` mock repositories, showing cross-project leakage detected by dry-dock:
 
 ![dry-dock Dashboard](drydock-dashboard.png)
 
 The dashboard highlights:
-- A high **RefactorScore** for the duplicated `duplicate()` function.
-- A **Leakage Matrix** showing the connection between `app-1` and `app-2`.
+- **2 cross-project leaks** detected — a shared `Product.js` Mongoose model (32 lines, RefactorScore 181) and a duplicated `db.js` database utility (19 lines, RefactorScore 107).
+- The **Leakage Matrix** clearly shows both `inventory-service` and `order-service` sharing the same duplicated modules.
+- A **Strategic Architecture Recommendation** is automatically generated: *Centralize Shared Packages* — extract the duplicated modules into a shared base library.
+- The **Dependency Graph** visualises the structural link between the two services (51 shared lines).
 
 ### Code Inspector
 
-You can now inspect the duplicated code directly in the dashboard by clicking the "Inspect Code" button on any leakage item. This opens a side-by-side comparison of the normalized code occurrences.
+Click **Inspect Code** on any leakage item to open the side-by-side **Clone Inspector**, showing the exact duplicated code with diff highlights across both repositories:
 
-![dry-dock Clone Inspector](drydock-inspector.png)
+![dry-dock Clone Inspector](drydock-modal.png)
