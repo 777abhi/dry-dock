@@ -27,73 +27,129 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>dry-dock Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Outfit', sans-serif;
+        }
+        code, pre {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        /* Custom scrollbars */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #09090b;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #27272a;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #3f3f46;
+        }
+    </style>
 </head>
-<body class="bg-gray-100 p-8">
+<body class="bg-[#09090b] text-zinc-100 min-h-screen p-8 selection:bg-violet-500/30 selection:text-violet-200">
     <div class="max-w-7xl mx-auto space-y-8">
-        <header class="flex justify-between items-center">
-            <h1 class="text-3xl font-bold text-gray-800">dry-dock Dashboard</h1>
-            <div id="stats" class="text-gray-600"></div>
+        <header class="flex justify-between items-center border-b border-zinc-900 pb-6">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-violet-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                    <span class="text-white font-extrabold text-xl">⚓</span>
+                </div>
+                <div>
+                    <h1 class="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-violet-400 via-pink-400 to-amber-300 bg-clip-text text-transparent">dry-dock</h1>
+                    <p class="text-xs text-zinc-500 font-semibold tracking-wide uppercase mt-0.5">Cross-Repository Duplication Detector</p>
+                </div>
+            </div>
+            <div id="stats" class="text-zinc-400 text-sm bg-zinc-900/60 border border-zinc-800 px-4 py-2 rounded-full font-semibold shadow-md"></div>
         </header>
 
          <!-- Setup / New Scan Section -->
-        <div class="bg-white rounded-lg shadow p-6">
-            <h2 class="text-xl font-bold mb-4 text-gray-800">New Scan</h2>
-            <div class="flex gap-4 items-end">
-                <div class="flex-1">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Repository Paths (comma separated)</label>
-                    <input type="text" id="repo-paths" class="w-full border rounded px-3 py-2" placeholder="/path/to/repo1, /path/to/repo2">
+        <div class="bg-zinc-900/40 backdrop-blur-md border border-zinc-800/80 rounded-2xl shadow-xl p-6 relative overflow-hidden">
+            <!-- Glow decoration -->
+            <div class="absolute top-0 right-0 w-64 h-64 bg-violet-600/5 rounded-full filter blur-3xl pointer-events-none"></div>
+            
+            <h2 class="text-xl font-bold mb-4 text-zinc-100 flex items-center gap-2">
+                <span class="text-violet-400">⚡</span> New Scan
+            </h2>
+            <div class="flex flex-col sm:flex-row gap-4 items-end relative z-10">
+                <div class="flex-1 w-full">
+                    <label class="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">Repository Paths (comma separated)</label>
+                    <input type="text" id="repo-paths" class="w-full bg-zinc-950/60 border border-zinc-800 focus:border-violet-500 focus:ring-1 focus:ring-violet-500 text-zinc-100 placeholder-zinc-650 rounded-xl px-4 py-3 transition-all duration-200 outline-none text-sm font-medium" placeholder="/path/to/repo1, /path/to/repo2">
                 </div>
-                <button id="browse-btn" onclick="browseFolder()" class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded">Browse...</button>
-                <button id="scan-btn" onclick="triggerScan()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded font-bold">Scan Now</button>
-                <button id="cancel-btn" onclick="cancelScan()" class="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded font-bold hidden">Cancel</button>
+                <div class="flex gap-3 w-full sm:w-auto">
+                    <button id="browse-btn" onclick="browseFolder()" class="flex-1 sm:flex-initial bg-zinc-900 hover:bg-zinc-800 border border-zinc-850 hover:border-zinc-700 text-zinc-200 px-5 py-3 rounded-xl transition-all duration-200 font-semibold text-sm active:scale-95">Browse...</button>
+                    <button id="scan-btn" onclick="triggerScan()" class="flex-1 sm:flex-initial bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white px-6 py-3 rounded-xl font-bold text-sm shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/30 transition-all duration-200 transform active:scale-95">Scan Now</button>
+                    <button id="cancel-btn" onclick="cancelScan()" class="flex-1 sm:flex-initial bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white px-6 py-3 rounded-xl font-bold text-sm shadow-lg shadow-rose-500/20 hover:shadow-rose-500/30 transition-all duration-200 transform active:scale-95 hidden">Cancel</button>
+                </div>
             </div>
-            <div id="scan-status" class="mt-2 text-sm text-gray-600"></div>
+            <div id="scan-status" class="mt-3 text-xs font-semibold text-zinc-500 tracking-wide uppercase"></div>
         </div>
 
         <div id="results-container" class="space-y-8 hidden">
             <!-- Trend Analysis Section -->
-            <div id="trend-section" class="bg-white rounded-lg shadow p-6 hidden">
-                <h2 class="text-xl font-bold mb-4 text-gray-800">Trend Analysis</h2>
+            <div id="trend-section" class="bg-zinc-900/30 border border-zinc-800/80 rounded-2xl p-6 hidden">
+                <h2 class="text-xl font-bold mb-4 text-zinc-100 flex items-center gap-2">
+                    <span class="text-cyan-400">📈</span> Trend Analysis
+                </h2>
                 <div id="trend-container" class="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <!-- Trend metrics will be rendered here -->
                 </div>
             </div>
 
-             <!-- Leakage Matrix -->
-            <div class="bg-white rounded-lg shadow p-6 overflow-x-auto">
-                <h2 class="text-xl font-bold mb-4 text-gray-800">Project Leakage Matrix</h2>
-                <div id="matrix-container">
-                    <!-- Matrix will be rendered here -->
+             <!-- Leakage Matrix & Graph -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                <div class="bg-zinc-900/40 backdrop-blur-md border border-zinc-800/80 rounded-2xl shadow-xl p-6 overflow-x-auto lg:col-span-7">
+                    <h2 class="text-xl font-bold mb-4 text-zinc-100 flex items-center gap-2">
+                        <span class="text-indigo-400">📊</span> Project Leakage Matrix
+                    </h2>
+                    <div id="matrix-container" class="overflow-x-auto rounded-xl border border-zinc-800/80">
+                        <!-- Matrix will be rendered here -->
+                    </div>
                 </div>
 
-                <h2 class="text-xl font-bold mt-8 mb-4 text-gray-800">Dependency Graph</h2>
-                <div id="graph-container" class="w-full flex justify-center mt-4">
-                    <!-- Graph will be rendered here -->
+                <div class="bg-zinc-900/40 backdrop-blur-md border border-zinc-800/80 rounded-2xl shadow-xl p-6 lg:col-span-5 flex flex-col">
+                    <h2 class="text-xl font-bold mb-4 text-zinc-100 flex items-center gap-2">
+                        <span class="text-pink-400">🕸️</span> Dependency Graph
+                    </h2>
+                    <div id="graph-container" class="w-full flex-1 flex justify-center items-center py-6 bg-[#040405] border border-zinc-850 rounded-xl min-h-[220px]">
+                        <!-- Graph will be rendered here -->
+                    </div>
                 </div>
             </div>
 
             <!-- Cross-Project Leakage List -->
             <div class="space-y-6">
-                <h2 class="text-2xl font-bold text-red-600">Cross-Project Leakage</h2>
+                <h2 class="text-2xl font-bold bg-gradient-to-r from-rose-400 to-orange-400 bg-clip-text text-transparent flex items-center gap-2">
+                    <span>🔥</span> Cross-Project Leakage
+                </h2>
                 <div id="leakage-list" class="grid gap-4">
                     <!-- Leakage items will be rendered here -->
                 </div>
             </div>
         </div>
         
-        <div id="empty-state" class="text-center py-12 text-gray-500">
-            No scan results yet. Add paths above and click "Scan Now" to begin.
+        <div id="empty-state" class="text-center py-20 bg-zinc-900/20 border border-dashed border-zinc-800 rounded-2xl">
+            <div class="text-4xl mb-4">🔍</div>
+            <p class="text-zinc-500 font-medium">No scan results yet. Add repository paths above and click "Scan Now" to begin.</p>
         </div>
     </div>
 
     <!-- Clone Inspector Modal -->
-    <div id="inspector-modal" class="fixed inset-0 bg-gray-900 bg-opacity-50 hidden flex items-center justify-center p-4">
-        <div class="bg-white rounded-lg shadow-xl w-full max-w-6xl h-[80vh] flex flex-col">
-            <div class="p-4 border-b flex justify-between items-center">
-                <h3 class="text-xl font-bold">Clone Inspector</h3>
-                <button onclick="closeInspector()" class="text-gray-500 hover:text-gray-700">&times;</button>
+    <div id="inspector-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
+        <div class="bg-zinc-950 border border-zinc-800/80 rounded-2xl shadow-2xl w-full max-w-6xl h-[85vh] flex flex-col overflow-hidden">
+            <div class="p-4 bg-zinc-900/50 border-b border-zinc-800/80 flex justify-between items-center">
+                <h3 class="text-lg font-bold text-zinc-100 flex items-center gap-2">
+                    <span class="text-violet-400">🔍</span> Clone Inspector
+                </h3>
+                <button onclick="closeInspector()" class="text-zinc-400 hover:text-zinc-100 text-2xl font-semibold leading-none">&times;</button>
             </div>
-            <div class="flex-1 overflow-hidden p-4 grid grid-cols-2 gap-4" id="inspector-content">
+            <div class="flex-1 overflow-hidden p-6 grid grid-cols-1 md:grid-cols-2 gap-6" id="inspector-content">
                 <!-- Code comparison will be injected here -->
             </div>
         </div>
@@ -101,7 +157,19 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
 
     <script type="module">
         import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
-        mermaid.initialize({ startOnLoad: true });
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'dark',
+            themeVariables: {
+                background: '#040405',
+                primaryColor: '#1e1b4b', // indigo-950
+                primaryTextColor: '#fafafa',
+                primaryBorderColor: '#312e81',
+                lineColor: '#6366f1', // indigo-500
+                secondaryColor: '#18181b',
+                tertiaryColor: '#27272a'
+            }
+        });
 
         // Attach functions to window so they can be called from HTML onclick attributes
         window.browseFolder = browseFolder;
@@ -194,7 +262,7 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
             renderStats(report);
             await renderMatrix(report);
             renderLeakage(report);
-            if (trend && trend.scoreChange !== undefined) {
+            if (trend && trend.score_change !== undefined) {
                 renderTrend(trend);
             }
         }
@@ -202,25 +270,25 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
         function renderTrend(trend) {
             document.getElementById('trend-section').classList.remove('hidden');
             const container = document.getElementById('trend-container');
-            const scoreColor = trend.score_change > 0 ? 'text-red-600' : (trend.score_change < 0 ? 'text-green-600' : 'text-gray-600');
+            const scoreColor = trend.score_change > 0 ? 'text-rose-400 font-bold' : (trend.score_change < 0 ? 'text-emerald-400 font-bold' : 'text-zinc-400');
             const scoreSign = trend.score_change > 0 ? '+' : '';
 
             container.innerHTML = \`
-                <div class="p-4 bg-gray-50 rounded border text-center">
-                    <div class="text-sm text-gray-500 uppercase tracking-wide">New Leaks</div>
-                    <div class="text-2xl font-bold text-red-600">\${trend.new_leaks.length}</div>
+                <div class="p-4 bg-zinc-900/60 border border-zinc-800 rounded-xl text-center shadow-lg">
+                    <div class="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">New Leaks</div>
+                    <div class="text-2xl font-extrabold text-rose-400 mt-1">\${trend.new_leaks.length}</div>
                 </div>
-                <div class="p-4 bg-gray-50 rounded border text-center">
-                    <div class="text-sm text-gray-500 uppercase tracking-wide">Resolved Leaks</div>
-                    <div class="text-2xl font-bold text-green-600">\${trend.resolved_leaks.length}</div>
+                <div class="p-4 bg-zinc-900/60 border border-zinc-800 rounded-xl text-center shadow-lg">
+                    <div class="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Resolved Leaks</div>
+                    <div class="text-2xl font-extrabold text-emerald-400 mt-1">\${trend.resolved_leaks.length}</div>
                 </div>
-                <div class="p-4 bg-gray-50 rounded border text-center">
-                    <div class="text-sm text-gray-500 uppercase tracking-wide">Remaining Leaks</div>
-                    <div class="text-2xl font-bold text-yellow-600">\${trend.remaining_leaks.length}</div>
+                <div class="p-4 bg-zinc-900/60 border border-zinc-800 rounded-xl text-center shadow-lg">
+                    <div class="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Remaining Leaks</div>
+                    <div class="text-2xl font-extrabold text-amber-400 mt-1">\${trend.remaining_leaks.length}</div>
                 </div>
-                <div class="p-4 bg-gray-50 rounded border text-center">
-                    <div class="text-sm text-gray-500 uppercase tracking-wide">Score Change</div>
-                    <div class="text-2xl font-bold \${scoreColor}">\${scoreSign}\${Math.round(trend.score_change)}</div>
+                <div class="p-4 bg-zinc-900/60 border border-zinc-800 rounded-xl text-center shadow-lg">
+                    <div class="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Score Change</div>
+                    <div class="text-2xl font-extrabold \${scoreColor} mt-1">\${scoreSign}\${Math.round(trend.score_change)}</div>
                 </div>
             \`;
         }
@@ -262,21 +330,21 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
             });
 
             // Build Table
-            let html = '<table class="min-w-full border-collapse"><thead><tr><th class="border p-2 bg-gray-50"></th>';
+            let html = '<table class="min-w-full border-collapse"><thead><tr><th class="p-3 bg-zinc-900 text-zinc-400 font-bold text-xs uppercase tracking-wider border border-zinc-800"></th>';
             projectList.forEach(p => {
-                html += \`<th class="border p-2 bg-gray-50 font-semibold text-sm rotate-0">\${escapeHtml(p)}</th>\`;
+                html += \`<th class="p-3 bg-zinc-900 text-zinc-400 font-bold text-xs uppercase tracking-wider border border-zinc-800">\${escapeHtml(p)}</th>\`;
             });
             html += '</tr></thead><tbody>';
 
             projectList.forEach(p1 => {
-                html += \`<tr><td class="border p-2 font-semibold bg-gray-50 text-sm">\${escapeHtml(p1)}</td>\`;
+                html += \`<tr><td class="p-3 font-semibold bg-zinc-900/40 text-zinc-300 text-xs border border-zinc-800">\${escapeHtml(p1)}</td>\`;
                 projectList.forEach(p2 => {
                     if (p1 === p2) {
-                         html += '<td class="border p-2 text-center text-gray-300">-</td>';
+                         html += '<td class="p-3 text-center text-zinc-700 border border-zinc-800">-</td>';
                     } else {
                         const count = matrix[p1][p2];
-                        const bgClass = count > 0 ? 'bg-red-100 text-red-800 font-bold' : 'bg-green-50 text-gray-400';
-                        html += \`<td class="border p-2 text-center \${bgClass}">\${count}</td>\`;
+                        const bgClass = count > 0 ? 'bg-rose-950/40 border border-rose-800/40 text-rose-400 font-bold shadow-inner' : 'bg-zinc-900/20 text-zinc-650';
+                        html += \`<td class="p-3 text-center text-sm border border-zinc-800 \${bgClass}">\${count}</td>\`;
                     }
                 });
                 html += '</tr>';
@@ -342,32 +410,35 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
                     console.error('Mermaid rendering failed', e);
                 }
             } else {
-                document.getElementById('graph-container').innerHTML = '<p class="text-gray-500 italic">No cross-project dependencies to map.</p>';
+                document.getElementById('graph-container').innerHTML = '<p class="text-zinc-500 italic">No cross-project dependencies to map.</p>';
             }
         }
 
         function renderLeakage(report) {
             const list = document.getElementById('leakage-list');
             list.innerHTML = report.cross_project_leakage.map(item => \`
-                <div class="p-4 border-l-4 border-red-500 bg-white shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div class="p-5 border-l-4 border-rose-500 bg-zinc-900/30 backdrop-blur-sm border border-zinc-800/80 rounded-xl shadow-lg shadow-black/10 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 transition-all duration-200 hover:border-zinc-700/80 hover:bg-zinc-900/50">
                     <div>
-                        <div class="font-mono text-xs text-gray-500 mb-1">Hash: \${item.hash.slice(0, 8)}...</div>
-                        <div class="text-lg font-semibold text-gray-900">
-                            \${item.lines} lines shared across <span class="text-blue-600">\${item.projects.map(p => escapeHtml(p)).join(', ')}</span>
+                        <div class="font-mono text-[10px] text-zinc-500 mb-1 tracking-wider uppercase">Hash: \${item.hash.slice(0, 8)}...</div>
+                        <div class="text-lg font-bold text-zinc-100">
+                            \${item.lines} lines shared across <span class="text-violet-400">\${item.projects.map(p => escapeHtml(p)).join(', ')}</span>
                         </div>
-                        <div class="text-sm text-gray-600 mt-2">
-                             Complexity: <span class="font-bold text-yellow-600">\${item.complexity}</span> | Found in: \${item.occurrences.map(o => {
+                        <div class="text-xs text-zinc-400 mt-2 flex flex-wrap gap-2 items-center">
+                             <span>Complexity: <span class="font-bold text-amber-400">\${item.complexity}</span></span>
+                             <span class="text-zinc-650">|</span>
+                             <span>Found in:</span>
+                             \${item.occurrences.map(o => {
                                  const meta = o.author ? \` title="Last modified by \${escapeHtml(o.author)} on \${o.date}"\` : '';
-                                 const ownerBadge = o.owners && o.owners.length > 0 ? \` <span class="bg-purple-100 text-purple-800 text-[10px] px-1 rounded ml-1">\${escapeHtml(o.owners.join(', '))}</span>\` : '';
-                                 return \`<span class="inline-flex items-center"><code class="bg-gray-100 px-1 py-0.5 rounded text-xs cursor-help"\${meta}>\${escapeHtml(o.file)}</code>\${ownerBadge}</span>\`;
+                                 const ownerBadge = o.owners && o.owners.length > 0 ? \` <span class="bg-purple-950/40 text-purple-300 border border-purple-800/30 text-[9px] px-1.5 py-0.5 rounded font-semibold ml-1">\${escapeHtml(o.owners.join(', '))}</span>\` : '';
+                                 return \`<span class="inline-flex items-center"><code class="bg-zinc-950 border border-zinc-800 px-2 py-0.5 rounded text-[11px] font-mono text-zinc-350 cursor-help"\${meta}>\&nbsp;\${escapeHtml(o.file)}</code>\${ownerBadge}</span>\`;
                              }).join(', ')}
                         </div>
                     </div>
-                    <div class="text-left md:text-right min-w-[150px]">
-                        <div class="text-3xl font-bold text-blue-600">\${Math.round(item.score).toLocaleString()}</div>
-                        <div class="text-xs text-gray-400 uppercase tracking-wider font-semibold">RefactorScore</div>
-                        <div class="text-xs text-gray-500 mt-1">Spread: \${item.spread} | Freq: \${item.frequency}</div>
-                        <button onclick="inspectClone('\${item.hash}')" class="mt-2 text-sm text-white bg-blue-600 px-3 py-1 rounded hover:bg-blue-700">Inspect Code</button>
+                    <div class="text-left md:text-right min-w-[160px] flex flex-col items-start md:items-end">
+                        <div class="text-3xl font-extrabold bg-gradient-to-r from-violet-400 to-indigo-400 bg-clip-text text-transparent">\${Math.round(item.score).toLocaleString()}</div>
+                        <div class="text-[9px] text-zinc-500 uppercase tracking-widest font-bold mt-0.5">RefactorScore</div>
+                        <div class="text-[11px] text-zinc-450 mt-1 font-semibold">Spread: \${item.spread} <span class="text-zinc-650">|</span> Freq: \${item.frequency}</div>
+                        <button onclick="inspectClone('\${item.hash}')" class="mt-3 text-xs text-zinc-200 hover:text-white bg-zinc-850 hover:bg-zinc-800 border border-zinc-700/80 hover:border-zinc-600 rounded-lg px-4 py-2 font-semibold shadow-md transition-all duration-150 transform active:scale-95">Inspect Code</button>
                     </div>
                 </div>
             \`).join('');
@@ -382,7 +453,7 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
              const modal = document.getElementById('inspector-modal');
              const content = document.getElementById('inspector-content');
              modal.classList.remove('hidden');
-             content.innerHTML = '<div class="col-span-2 text-center">Loading code...</div>';
+             content.innerHTML = '<div class="col-span-2 text-center text-zinc-400">Loading code...</div>';
 
              // Take top 2 occurrences for comparison
              const [occ1, occ2] = item.occurrences.slice(0, 2);
@@ -400,8 +471,8 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
                  let formattedCode2 = '';
 
                  diff.forEach(part => {
-                     const color = part.added ? 'bg-green-100 text-green-800' :
-                                   part.removed ? 'bg-red-100 text-red-800' : 'text-gray-800';
+                     const color = part.added ? 'bg-emerald-950/30 text-emerald-400 border-l border-emerald-500/50 px-1 py-0.5 rounded' :
+                                   part.removed ? 'bg-rose-950/30 text-rose-400 border-l border-rose-500/50 px-1 py-0.5 rounded' : 'text-zinc-300';
                      const escapedValue = escapeHtml(part.value);
 
                      if (part.added) {
@@ -415,17 +486,23 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
                  });
 
                  content.innerHTML = \`
-                    <div class="flex flex-col h-full overflow-hidden border rounded">
-                        <div class="bg-gray-100 p-2 border-b font-mono text-sm font-semibold">\${escapeHtml(file1)} (\${escapeHtml(proj1)})</div>
-                        <pre class="flex-1 overflow-auto p-4 text-xs bg-gray-50 whitespace-pre-wrap"><code>\${formattedCode1}</code></pre>
+                    <div class="flex flex-col h-full overflow-hidden border border-zinc-800/85 rounded-xl bg-zinc-950">
+                        <div class="bg-zinc-900/60 p-3 border-b border-zinc-800 font-mono text-xs text-zinc-300 font-semibold flex justify-between items-center">
+                            <span class="truncate" title="\${escapeHtml(file1)}">\${escapeHtml(file1)}</span>
+                            <span class="text-[10px] text-zinc-500 bg-zinc-950 border border-zinc-800 px-2 py-0.5 rounded font-bold ml-2 shrink-0">\${escapeHtml(proj1)}</span>
+                        </div>
+                        <pre class="flex-1 overflow-auto p-4 text-[12px] bg-zinc-950/40 text-zinc-300 whitespace-pre-wrap font-mono leading-relaxed"><code>\${formattedCode1}</code></pre>
                     </div>
-                    <div class="flex flex-col h-full overflow-hidden border rounded">
-                        <div class="bg-gray-100 p-2 border-b font-mono text-sm font-semibold">\${escapeHtml(file2)} (\${escapeHtml(proj2)})</div>
-                        <pre class="flex-1 overflow-auto p-4 text-xs bg-gray-50 whitespace-pre-wrap"><code>\${formattedCode2}</code></pre>
+                    <div class="flex flex-col h-full overflow-hidden border border-zinc-800/85 rounded-xl bg-zinc-950">
+                        <div class="bg-zinc-900/60 p-3 border-b border-zinc-800 font-mono text-xs text-zinc-300 font-semibold flex justify-between items-center">
+                            <span class="truncate" title="\${escapeHtml(file2)}">\${escapeHtml(file2)}</span>
+                            <span class="text-[10px] text-zinc-500 bg-zinc-950 border border-zinc-800 px-2 py-0.5 rounded font-bold ml-2 shrink-0">\${escapeHtml(proj2)}</span>
+                        </div>
+                        <pre class="flex-1 overflow-auto p-4 text-[12px] bg-zinc-950/40 text-zinc-300 whitespace-pre-wrap font-mono leading-relaxed"><code>\${formattedCode2}</code></pre>
                     </div>
                  \`;
              } catch (e) {
-                 content.innerHTML = '<div class="col-span-2 text-red-600">Error loading diff.</div>';
+                 content.innerHTML = '<div class="col-span-2 text-red-400">Error loading diff.</div>';
              }
         }
 
