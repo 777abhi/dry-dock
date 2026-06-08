@@ -36,6 +36,7 @@ async function runTests() {
                 {
                     hash: '123',
                     lines: 10,
+                    complexity: 5,
                     frequency: 2,
                     score: 100,
                     spread: 2,

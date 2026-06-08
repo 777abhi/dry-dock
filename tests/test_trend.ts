@@ -5,6 +5,7 @@ function createMockLeakage(hash: string, score: number): CrossProjectLeakage {
     return {
         hash,
         lines: 10,
+        complexity: 5,
         frequency: 2,
         spread: 2,
         score,

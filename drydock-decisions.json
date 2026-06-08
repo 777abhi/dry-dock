@@ -1,0 +1,8 @@
+{
+  "df786656939bebb36be7c70283d3741b8c227d6957937eae60d9e23a5b228234": {
+    "status": "Centralize",
+    "notes": "Merging common Product mongoose model into shared base library to reduce technical debt.",
+    "owner": "Test QA Centralization Team",
+    "updatedAt": "2026-06-08T21:20:19.152Z"
+  }
+}

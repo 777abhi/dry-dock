@@ -6,7 +6,7 @@ import * as url from 'url';
 import fg from 'fast-glob';
 import { scanFile } from './scanner';
 import { getIgnorePatterns } from './utils';
-import { getGitInfo } from './git-utils';
+import { getGitInfo, getGitInfoAsync } from './git-utils';
 import { DryDockReport, InternalDuplicate, CrossProjectLeakage, Occurrence } from './types';
 import { exportToCSV, exportToJUnit, exportToHTML, exportToMermaid, exportToPDF } from './reporter';
 import { getCodeOwners } from './codeowners';
@@ -89,9 +89,33 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
                 </div>
             </div>
             <div id="scan-status" class="mt-3 text-xs font-semibold text-zinc-500 tracking-wide uppercase"></div>
+            <!-- Progress Bar Container -->
+            <div id="progress-container" class="mt-5 space-y-2 hidden relative z-10">
+                <div class="flex justify-between items-center text-xs font-bold uppercase tracking-wider">
+                    <span id="progress-message" class="text-violet-400">Initializing...</span>
+                    <div class="flex items-center gap-2">
+                        <span id="progress-eta" class="text-zinc-500 font-semibold normal-case"></span>
+                        <span id="progress-percent" class="text-zinc-400">0%</span>
+                    </div>
+                </div>
+                <div class="w-full bg-zinc-950 border border-zinc-850 rounded-full h-3 overflow-hidden p-0.5">
+                    <div id="progress-fill" class="bg-gradient-to-r from-violet-600 to-indigo-600 h-full rounded-full w-0 transition-all duration-300"></div>
+                </div>
+            </div>
         </div>
 
         <div id="results-container" class="space-y-8 hidden">
+            <!-- Strategic Architecture Recommendation Section -->
+            <div id="recommendation-section" class="bg-zinc-900/40 backdrop-blur-md border border-zinc-800/80 rounded-2xl p-6 relative overflow-hidden shadow-xl">
+                <div class="absolute top-0 right-0 w-64 h-64 bg-indigo-600/5 rounded-full filter blur-3xl pointer-events-none"></div>
+                <h2 class="text-xl font-bold mb-3 text-zinc-100 flex items-center gap-2">
+                    <span class="text-violet-400">🏛️</span> Strategic Architecture Recommendation
+                </h2>
+                <div id="recommendation-content" class="text-sm text-zinc-300 relative z-10">
+                    <!-- Dynamic recommendation text will be rendered here -->
+                </div>
+            </div>
+
             <!-- Trend Analysis Section -->
             <div id="trend-section" class="bg-zinc-900/30 border border-zinc-800/80 rounded-2xl p-6 hidden">
                 <h2 class="text-xl font-bold mb-4 text-zinc-100 flex items-center gap-2">
@@ -157,6 +181,8 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
 
     <script type="module">
         import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        let reportData = null;
+        let progressInterval = null;
         mermaid.initialize({
             startOnLoad: true,
             theme: 'dark',
@@ -177,6 +203,8 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
         window.cancelScan = cancelScan;
         window.inspectClone = inspectClone;
         window.closeInspector = closeInspector;
+        window.toggleDecisionPanel = toggleDecisionPanel;
+        window.saveDecision = saveDecision;
 
         async function browseFolder() {
              try {
@@ -200,9 +228,57 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
                 return;
             }
 
-            document.getElementById('scan-status').innerText = 'Scanning...';
+            document.getElementById('scan-status').innerText = 'Starting scan...';
             document.getElementById('scan-btn').classList.add('hidden');
             document.getElementById('cancel-btn').classList.remove('hidden');
+
+            const progressContainer = document.getElementById('progress-container');
+            const progressFill = document.getElementById('progress-fill');
+            const progressPercent = document.getElementById('progress-percent');
+            const progressMsg = document.getElementById('progress-message');
+            const progressEta = document.getElementById('progress-eta');
+
+            progressContainer.classList.remove('hidden');
+            progressFill.style.width = '0%';
+            progressPercent.innerText = '0%';
+            progressMsg.innerText = 'Initializing...';
+            if (progressEta) progressEta.innerText = 'ETA: calculating...';
+
+            const scanStartTime = Date.now();
+
+            progressInterval = setInterval(async () => {
+                try {
+                    const res = await fetch('/api/scan/progress');
+                    if (res.ok) {
+                        const progress = await res.json();
+                        if (progress.stage !== 'idle') {
+                            progressFill.style.width = progress.percent + '%';
+                            progressPercent.innerText = progress.percent + '%';
+                            progressMsg.innerText = progress.message;
+
+                            // Calculate ETA
+                            const elapsedMs = Date.now() - scanStartTime;
+                            if (progress.percent > 5 && elapsedMs > 1000) {
+                                const remainingMs = (elapsedMs / progress.percent) * (100 - progress.percent);
+                                const remainingSec = Math.round(remainingMs / 1000);
+                                if (remainingSec > 60) {
+                                    const mins = Math.floor(remainingSec / 60);
+                                    const secs = remainingSec % 60;
+                                    if (progressEta) progressEta.innerText = \`ETA: \${mins}m \${secs}s\`;
+                                } else if (remainingSec > 0) {
+                                    if (progressEta) progressEta.innerText = \`ETA: \${remainingSec}s\`;
+                                } else {
+                                    if (progressEta) progressEta.innerText = 'ETA: < 1s';
+                                }
+                            } else {
+                                if (progressEta) progressEta.innerText = 'ETA: calculating...';
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.error('Error fetching scan progress', e);
+                }
+            }, 500);
             
             try {
                 const response = await fetch('/api/scan', {
@@ -210,13 +286,24 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ paths })
                 });
+
+                clearInterval(progressInterval);
+                progressInterval = null;
+                if (progressEta) progressEta.innerText = '';
                 
                 if (response.ok) {
                     const report = await response.json();
                     renderReport(report);
                     document.getElementById('scan-status').innerText = 'Scan complete!';
+                    progressFill.style.width = '100%';
+                    progressPercent.innerText = '100%';
+                    progressMsg.innerText = 'Scan completed successfully!';
+                    setTimeout(() => {
+                        progressContainer.classList.add('hidden');
+                    }, 3000);
                 } else {
                      const err = await response.json();
+                     progressContainer.classList.add('hidden');
                      if (err.error === 'Scan cancelled') {
                         document.getElementById('scan-status').innerText = 'Scan cancelled.';
                      } else {
@@ -225,6 +312,10 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
                 }
             } catch (e) {
                 console.error(e);
+                clearInterval(progressInterval);
+                progressInterval = null;
+                if (progressEta) progressEta.innerText = '';
+                progressContainer.classList.add('hidden');
                 document.getElementById('scan-status').innerText = 'Error triggering scan.';
             } finally {
                 document.getElementById('scan-btn').classList.remove('hidden');
@@ -234,6 +325,14 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
 
         async function cancelScan() {
              document.getElementById('scan-status').innerText = 'Cancelling...';
+             if (progressInterval) {
+                 clearInterval(progressInterval);
+                 progressInterval = null;
+             }
+             const progressMsg = document.getElementById('progress-message');
+             if (progressMsg) progressMsg.innerText = 'Cancelling scan...';
+             const progressEta = document.getElementById('progress-eta');
+             if (progressEta) progressEta.innerText = '';
              await fetch('/api/cancel', { method: 'POST' });
         }
 
@@ -262,6 +361,7 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
             renderStats(report);
             await renderMatrix(report);
             renderLeakage(report);
+            renderRecommendation(report);
             if (trend && trend.score_change !== undefined) {
                 renderTrend(trend);
             }
@@ -416,35 +516,197 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
 
         function renderLeakage(report) {
             const list = document.getElementById('leakage-list');
-            list.innerHTML = report.cross_project_leakage.map(item => \`
-                <div class="p-5 border-l-4 border-rose-500 bg-zinc-900/30 backdrop-blur-sm border border-zinc-800/80 rounded-xl shadow-lg shadow-black/10 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 transition-all duration-200 hover:border-zinc-700/80 hover:bg-zinc-900/50">
-                    <div>
-                        <div class="font-mono text-[10px] text-zinc-500 mb-1 tracking-wider uppercase">Hash: \${item.hash.slice(0, 8)}...</div>
-                        <div class="text-lg font-bold text-zinc-100">
-                            \${item.lines} lines shared across <span class="text-violet-400">\${item.projects.map(p => escapeHtml(p)).join(', ')}</span>
+            
+            const statusBadges = {
+                'None': 'bg-zinc-900/60 text-zinc-400 border-zinc-800',
+                'Centralize': 'bg-violet-950/40 text-violet-300 border-violet-800/40',
+                'Monorepo Merge': 'bg-amber-950/40 text-amber-300 border-amber-800/40',
+                'Accept': 'bg-emerald-950/40 text-emerald-300 border-emerald-800/40',
+                'Investigate': 'bg-cyan-950/40 text-cyan-300 border-cyan-800/40'
+            };
+
+            const statusLabels = {
+                'None': 'Pending Decision',
+                'Centralize': 'Centralize in Base',
+                'Monorepo Merge': 'Monorepo Merge',
+                'Accept': 'Accepted (Boilerplate)',
+                'Investigate': 'Under Investigation'
+            };
+
+            list.innerHTML = report.cross_project_leakage.map(item => {
+                const dec = item.decision || { status: 'None', notes: '', owner: '' };
+                const currentStatusLabel = statusLabels[dec.status] || 'Pending Decision';
+                const currentBadgeClass = statusBadges[dec.status] || statusBadges['None'];
+                
+                return \`
+                <div class="p-5 border-l-4 border-rose-500 bg-zinc-900/30 backdrop-blur-sm border border-zinc-800/80 rounded-xl shadow-lg shadow-black/10 flex flex-col gap-4 transition-all duration-200 hover:border-zinc-700/80 hover:bg-zinc-900/50">
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2 mb-2">
+                                <span class="font-mono text-[10px] text-zinc-500 tracking-wider uppercase">Hash: \${item.hash.slice(0, 8)}...</span>
+                                <span class="border text-[10px] px-2 py-0.5 rounded-full font-bold tracking-wide \${currentBadgeClass}">\${currentStatusLabel}</span>
+                            </div>
+                            <div class="text-lg font-bold text-zinc-100">
+                                \${item.lines} lines shared across <span class="text-violet-400">\${item.projects.map(p => escapeHtml(p)).join(', ')}</span>
+                            </div>
+                            <div class="text-xs text-zinc-400 mt-2 flex flex-wrap gap-2 items-center">
+                                 <span>Complexity: <span class="font-bold text-amber-400">\${item.complexity}</span></span>
+                                 <span class="text-zinc-650">|</span>
+                                 <span>Found in:</span>
+                                 \${item.occurrences.map(o => {
+                                     const meta = o.author ? \` title="Last modified by \${escapeHtml(o.author)} on \${o.date}"\` : '';
+                                     const ownerBadge = o.owners && o.owners.length > 0 ? \` <span class="bg-purple-950/40 text-purple-300 border border-purple-800/30 text-[9px] px-1.5 py-0.5 rounded font-semibold ml-1">\${escapeHtml(o.owners.join(', '))}</span>\` : '';
+                                     return \`<span class="inline-flex items-center"><code class="bg-zinc-950 border border-zinc-800 px-2 py-0.5 rounded text-[11px] font-mono text-zinc-300 cursor-help"\${meta}>\${escapeHtml(o.file)}</code>\${ownerBadge}</span>\`;
+                                 }).join(', ')}
+                            </div>
                         </div>
-                        <div class="text-xs text-zinc-400 mt-2 flex flex-wrap gap-2 items-center">
-                             <span>Complexity: <span class="font-bold text-amber-400">\${item.complexity}</span></span>
-                             <span class="text-zinc-650">|</span>
-                             <span>Found in:</span>
-                             \${item.occurrences.map(o => {
-                                 const meta = o.author ? \` title="Last modified by \${escapeHtml(o.author)} on \${o.date}"\` : '';
-                                 const ownerBadge = o.owners && o.owners.length > 0 ? \` <span class="bg-purple-950/40 text-purple-300 border border-purple-800/30 text-[9px] px-1.5 py-0.5 rounded font-semibold ml-1">\${escapeHtml(o.owners.join(', '))}</span>\` : '';
-                                 return \`<span class="inline-flex items-center"><code class="bg-zinc-950 border border-zinc-800 px-2 py-0.5 rounded text-[11px] font-mono text-zinc-350 cursor-help"\${meta}>\&nbsp;\${escapeHtml(o.file)}</code>\${ownerBadge}</span>\`;
-                             }).join(', ')}
+                        <div class="text-left md:text-right min-w-[160px] flex flex-col items-start md:items-end">
+                            <div class="text-3xl font-extrabold bg-gradient-to-r from-violet-400 to-indigo-400 bg-clip-text text-transparent">\${Math.round(item.score).toLocaleString()}</div>
+                            <div class="text-[9px] text-zinc-500 uppercase tracking-widest font-bold mt-0.5">RefactorScore</div>
+                            <div class="text-[11px] text-zinc-450 mt-1 font-semibold">Spread: \${item.spread} <span class="text-zinc-650">|</span> Freq: \${item.frequency}</div>
+                            <div class="flex gap-2 mt-3 w-full justify-start md:justify-end">
+                                <button onclick="inspectClone('\${item.hash}')" class="text-xs text-zinc-200 hover:text-white bg-zinc-850 hover:bg-zinc-800 border border-zinc-700/80 hover:border-zinc-600 rounded-lg px-3 py-2 font-semibold shadow-md transition-all duration-150 transform active:scale-95">Inspect Code</button>
+                                <button onclick="toggleDecisionPanel('\${item.hash}')" class="text-xs text-zinc-200 hover:text-white bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 hover:border-zinc-750 rounded-lg px-3 py-2 font-semibold shadow-md transition-all duration-150 transform active:scale-95 flex items-center gap-1">
+                                    <span>⚙️ Decision</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
-                    <div class="text-left md:text-right min-w-[160px] flex flex-col items-start md:items-end">
-                        <div class="text-3xl font-extrabold bg-gradient-to-r from-violet-400 to-indigo-400 bg-clip-text text-transparent">\${Math.round(item.score).toLocaleString()}</div>
-                        <div class="text-[9px] text-zinc-500 uppercase tracking-widest font-bold mt-0.5">RefactorScore</div>
-                        <div class="text-[11px] text-zinc-450 mt-1 font-semibold">Spread: \${item.spread} <span class="text-zinc-650">|</span> Freq: \${item.frequency}</div>
-                        <button onclick="inspectClone('\${item.hash}')" class="mt-3 text-xs text-zinc-200 hover:text-white bg-zinc-850 hover:bg-zinc-800 border border-zinc-700/80 hover:border-zinc-600 rounded-lg px-4 py-2 font-semibold shadow-md transition-all duration-150 transform active:scale-95">Inspect Code</button>
+
+                    <div id="decision-panel-\${item.hash}" class="hidden border-t border-zinc-800/80 pt-4 mt-2">
+                        <div class="bg-zinc-950/40 border border-zinc-850 rounded-xl p-4 grid grid-cols-1 md:grid-cols-12 gap-4">
+                            <div class="md:col-span-4">
+                                <label class="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1.5">Action Status</label>
+                                <select id="decision-status-\${item.hash}" class="w-full bg-zinc-900 border border-zinc-800 rounded-lg text-xs text-zinc-200 px-3 py-2 outline-none focus:border-violet-500 transition-all font-semibold">
+                                    <option value="None" \${dec.status === 'None' ? 'selected' : ''}>Select Action...</option>
+                                    <option value="Centralize" \${dec.status === 'Centralize' ? 'selected' : ''}>Centralize in Base</option>
+                                    <option value="Monorepo Merge" \${dec.status === 'Monorepo Merge' ? 'selected' : ''}>Monorepo Merge Candidate</option>
+                                    <option value="Accept" \${dec.status === 'Accept' ? 'selected' : ''}>Accept Duplicate (Boilerplate)</option>
+                                    <option value="Investigate" \${dec.status === 'Investigate' ? 'selected' : ''}>Under Investigation</option>
+                                </select>
+                                
+                                <div class="mt-3">
+                                    <label class="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1.5">Owner / Team</label>
+                                    <input type="text" id="decision-owner-\${item.hash}" value="\${escapeHtml(dec.owner)}" placeholder="e.g. Core QE Team" class="w-full bg-zinc-900 border border-zinc-800 rounded-lg text-xs text-zinc-200 px-3 py-2 outline-none focus:border-violet-500 transition-all font-semibold" />
+                                </div>
+                            </div>
+                            <div class="md:col-span-8 flex flex-col">
+                                <label class="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1.5">Discussion Notes & Rationale</label>
+                                <textarea id="decision-notes-\${item.hash}" placeholder="Explain why this decision was made and what specific steps to take..." class="w-full flex-1 bg-zinc-900 border border-zinc-800 rounded-lg text-xs text-zinc-200 p-3 outline-none focus:border-violet-500 transition-all min-h-[80px] font-medium resize-none">\${escapeHtml(dec.notes)}</textarea>
+                                <div class="flex justify-end items-center gap-3 mt-3">
+                                    <span id="decision-save-status-\${item.hash}" class="text-[11px] font-semibold text-emerald-400 hidden">✓ Decision Saved</span>
+                                    <button onclick="saveDecision('\${item.hash}')" class="text-xs text-white bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 rounded-lg px-4 py-2 font-bold shadow-md hover:shadow-indigo-500/10 transition-all duration-150 transform active:scale-95">Save Decision</button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            \`).join('');
+                \`;
+            }).join('');
         }
 
-        let reportData = null;
+        function renderRecommendation(report) {
+            const container = document.getElementById('recommendation-content');
+            if (!report.cross_project_leakage || report.cross_project_leakage.length === 0) {
+                container.innerHTML = '<div class="flex items-start gap-3 p-4 bg-emerald-950/20 border border-emerald-900/30 rounded-xl text-emerald-300">' +
+                        '<span class="text-xl">✅</span>' +
+                        '<div>' +
+                            '<div class="font-bold text-zinc-100 text-base mb-1">Architecture is Clean</div>' +
+                            '<p class="text-zinc-400">No cross-project code leakage was detected across the directories. The separation of your automation frameworks is clean and free of redundant duplication. Continue keeping them in separate repositories and using the shared base framework.</p>' +
+                        '</div>' +
+                    '</div>';
+                return;
+            }
+
+            const totalLeaks = report.cross_project_leakage.length;
+            const totalDuplicatedLines = report.cross_project_leakage.reduce((sum, item) => sum + item.lines, 0);
+            
+            const projects = new Set();
+            report.cross_project_leakage.forEach(item => {
+                item.projects.forEach(p => projects.add(p));
+            });
+            const numProjects = projects.size;
+
+            let title = '';
+            let text = '';
+            let icon = '';
+            let colorClass = '';
+
+            if (numProjects >= 3 && totalDuplicatedLines > 250) {
+                title = 'Recommendation: Merge into a Monorepo';
+                icon = '🏢';
+                colorClass = 'bg-amber-950/30 border-amber-900/40 text-amber-300';
+                text = 'Pervasive structural duplication detected across <strong>' + numProjects + ' automation repositories</strong> totaling <strong>' + totalDuplicatedLines + ' lines of copied code</strong>. ' +
+                    '<br/><br/>' +
+                    'Because Playwright step definitions, configs, and helper modules have high structural overlap, we strongly recommend <strong>merging these individual repositories into a single Monorepo</strong>.' +
+                    '<br/><br/>' +
+                    '<strong>Monorepo Benefits:</strong>' +
+                    '<ul class="list-disc list-inside mt-2 space-y-1 text-zinc-400 font-medium">' +
+                        '<li>Unified dependency management for TypeScript, Playwright, and Cucumber.</li>' +
+                        '<li>Eliminates copy-paste drift since step definitions and helper libraries live in a shared package directory and can be updated instantly for all teams.</li>' +
+                        '<li>Simplified CI/CD orchestration and consistent code quality policies across all test suites.</li>' +
+                    '</ul>';
+            } else {
+                title = 'Recommendation: Centralize Shared Packages';
+                icon = '📦';
+                colorClass = 'bg-violet-950/30 border-violet-900/40 text-violet-300';
+                text = 'Specific duplicated modules detected across your test frameworks (totaling <strong>' + totalDuplicatedLines + ' lines</strong>). ' +
+                    '<br/><br/>' +
+                    'The duplication is localized to specific utilities (e.g., database connection utilities, common assertions). We recommend <strong>retaining separate repositories but abstracting these specific modules into the shared base framework</strong>.' +
+                    '<br/><br/>' +
+                    '<strong>Centralization Actions:</strong>' +
+                    '<ul class="list-disc list-inside mt-2 space-y-1 text-zinc-400 font-medium">' +
+                        '<li>Abstract high-RefactorScore clones (like the ones with scores > 100) into the base framework utility.</li>' +
+                        '<li>Use standard semantic versioned packages in the 4 testing repos to call the centralized code.</li>' +
+                        '<li>Establish a whitelisting threshold to reject new cross-project leakage in pull requests.</li>' +
+                    '</ul>';
+            }
+
+            container.innerHTML = '<div class="flex items-start gap-4 p-5 rounded-2xl border ' + colorClass + '">' +
+                    '<span class="text-3xl shrink-0 mt-0.5">' + icon + '</span>' +
+                    '<div>' +
+                        '<div class="font-extrabold text-zinc-50 text-lg mb-2 tracking-tight">' + title + '</div>' +
+                        '<div class="text-zinc-300 leading-relaxed font-medium text-sm">' + text + '</div>' +
+                        '<div class="mt-4 p-3 bg-zinc-950/60 border border-zinc-900 rounded-xl text-xs flex justify-between items-center text-zinc-400 font-semibold">' +
+                            '<span>Total Leakage Items: <strong class="text-zinc-200">' + totalLeaks + '</strong></span>' +
+                            '<span>Total Shared Lines: <strong class="text-zinc-200">' + totalDuplicatedLines + ' lines</strong></span>' +
+                            '<span>Affected Frameworks: <strong class="text-zinc-200">' + numProjects + '</strong></span>' +
+                        '</div>' +
+                    '</div>' +
+                '</div>';
+        }
+
+        function toggleDecisionPanel(hash) {
+             const panel = document.getElementById('decision-panel-' + hash);
+             panel.classList.toggle('hidden');
+        }
+
+        async function saveDecision(hash) {
+             const status = document.getElementById('decision-status-' + hash).value;
+             const owner = document.getElementById('decision-owner-' + hash).value;
+             const notes = document.getElementById('decision-notes-' + hash).value;
+             const saveStatus = document.getElementById('decision-save-status-' + hash);
+
+             try {
+                 const response = await fetch('/api/decision', {
+                     method: 'POST',
+                     headers: { 'Content-Type': 'application/json' },
+                     body: JSON.stringify({ hash, status, owner, notes })
+                 });
+                 if (response.ok) {
+                     saveStatus.classList.remove('hidden');
+                     setTimeout(async () => {
+                         saveStatus.classList.add('hidden');
+                         await loadData();
+                     }, 1000);
+                 } else {
+                     alert('Error saving decision');
+                 }
+             } catch (e) {
+                 console.error(e);
+                 alert('Error saving decision');
+             }
+        }
 
         async function inspectClone(hash) {
              const item = reportData.cross_project_leakage.find(i => i.hash === hash) || reportData.internal_duplicates.find(i => i.hash === hash);
@@ -563,6 +825,11 @@ let shouldCancel = false;
 
 async function executeScan(paths: string[], options: ScanOptions): Promise<DryDockReport> {
     shouldCancel = false; // Reset cancel flag at start
+    scanStage = 'searching';
+    scanTotalFiles = 0;
+    scanProcessedFiles = 0;
+    scanGitTotal = 0;
+    scanGitProcessed = 0;
     const entries: string[] = [];
 
     // Expand directories to globs
@@ -608,6 +875,8 @@ async function executeScan(paths: string[], options: ScanOptions): Promise<DryDo
 
     // Filter out non-files first
     const validFiles = files.filter(file => fs.statSync(file).isFile());
+    scanTotalFiles = validFiles.length;
+    scanStage = 'scanning';
 
     const numWorkers = Math.max(1, os.cpus().length - 1);
     const chunkSize = Math.ceil(validFiles.length / numWorkers);
@@ -638,6 +907,7 @@ async function executeScan(paths: string[], options: ScanOptions): Promise<DryDo
 
             worker.on('message', (item: any) => {
                 processed++;
+                scanProcessedFiles = processed;
                 if (processed % 100 === 0) {
                     console.log(`Processed ${processed}/${validFiles.length} files...`);
                 }
@@ -683,6 +953,42 @@ async function executeScan(paths: string[], options: ScanOptions): Promise<DryDo
 
     console.log(`Found ${allProjects.size} project roots`);
 
+    // Pre-fetch Git Info asynchronously in parallel batches to prevent blocking the event loop
+    const uniqueFiles = new Set<string>();
+    for (const [hash, data] of index.entries()) {
+        if (data.occurrences.length > 1) {
+            for (const occ of data.occurrences) {
+                uniqueFiles.add(path.resolve(process.cwd(), occ.file));
+            }
+        }
+    }
+
+    console.log(`Pre-fetching git info for ${uniqueFiles.size} unique duplicate files...`);
+    const gitInfoMap = new Map<string, any>();
+    const uniqueFilesArray = Array.from(uniqueFiles);
+    const gitBatchSize = 50;
+    
+    scanStage = 'fetching_git';
+    scanGitTotal = uniqueFilesArray.length;
+    scanGitProcessed = 0;
+
+    for (let i = 0; i < uniqueFilesArray.length; i += gitBatchSize) {
+        if (shouldCancel) break;
+        const batch = uniqueFilesArray.slice(i, i + gitBatchSize);
+        const results = await Promise.all(batch.map(async (file) => {
+            const info = await getGitInfoAsync(file);
+            return { file, info };
+        }));
+        for (const res of results) {
+            if (res.info) {
+                gitInfoMap.set(res.file, res.info);
+            }
+        }
+        scanGitProcessed += batch.length;
+    }
+    console.log('Finished pre-fetching git info.');
+    scanStage = 'completed';
+
     const internal_duplicates: InternalDuplicate[] = [];
     const cross_project_leakage: CrossProjectLeakage[] = [];
 
@@ -694,7 +1000,7 @@ async function executeScan(paths: string[], options: ScanOptions): Promise<DryDo
         // Enrich occurrences with git info now that we know they are duplicates
         const enrichedOccurrences = data.occurrences.map(occ => {
             const fullPath = path.resolve(process.cwd(), occ.file);
-            const gitInfo = getGitInfo(fullPath);
+            const gitInfo = gitInfoMap.get(fullPath) || null;
             const owners = getCodeOwners(fullPath);
             return {
                 ...occ,
@@ -743,6 +1049,12 @@ async function executeScan(paths: string[], options: ScanOptions): Promise<DryDo
 let currentReport: DryDockReport | null = null;
 let currentTrendData: TrendResult | null = null;
 let currentCliOptions: ScanOptions = { minLines: 0, ignorePatterns: [], whitelist: [] };
+
+let scanStage: 'idle' | 'searching' | 'scanning' | 'fetching_git' | 'completed' = 'idle';
+let scanTotalFiles = 0;
+let scanProcessedFiles = 0;
+let scanGitTotal = 0;
+let scanGitProcessed = 0;
 
 async function main() {
     const args = process.argv.slice(2);
@@ -1030,7 +1342,30 @@ async function main() {
                 },
                 '/api/data': (req, res) => {
                     res.writeHead(200, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify(currentReport || { internal_duplicates: [], cross_project_leakage: [] }));
+                    const report = currentReport || { internal_duplicates: [], cross_project_leakage: [] };
+                    
+                    const decisionsPath = path.resolve(process.cwd(), 'drydock-decisions.json');
+                    let decisions: Record<string, any> = {};
+                    if (fs.existsSync(decisionsPath)) {
+                        try {
+                            decisions = JSON.parse(fs.readFileSync(decisionsPath, 'utf-8'));
+                        } catch (e) {
+                            console.error('Error loading decisions:', e);
+                        }
+                    }
+
+                    const annotatedLeakage = report.cross_project_leakage.map((item: any) => {
+                        const dec = decisions[item.hash];
+                        return {
+                            ...item,
+                            decision: dec || { status: 'None', notes: '', owner: '' }
+                        };
+                    });
+
+                    res.end(JSON.stringify({
+                        ...report,
+                        cross_project_leakage: annotatedLeakage
+                    }));
                 },
                 '/api/trend': (req, res) => {
                     if (currentTrendData) {
@@ -1040,6 +1375,35 @@ async function main() {
                         res.writeHead(404, { 'Content-Type': 'application/json' });
                         res.end(JSON.stringify({ error: 'No trend data available' }));
                     }
+                },
+                '/api/scan/progress': (req, res) => {
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    let percent = 0;
+                    let message = 'Idle';
+                    if (scanStage === 'searching') {
+                        percent = 5;
+                        message = 'Searching repository files...';
+                    } else if (scanStage === 'scanning') {
+                        const ratio = scanTotalFiles > 0 ? (scanProcessedFiles / scanTotalFiles) : 0;
+                        percent = Math.round(5 + 75 * ratio);
+                        message = `Analyzing code duplication (${scanProcessedFiles}/${scanTotalFiles} files)...`;
+                    } else if (scanStage === 'fetching_git') {
+                        const ratio = scanGitTotal > 0 ? (scanGitProcessed / scanGitTotal) : 0;
+                        percent = Math.round(80 + 20 * ratio);
+                        message = `Fetching git blame history (${scanGitProcessed}/${scanGitTotal} files)...`;
+                    } else if (scanStage === 'completed') {
+                        percent = 100;
+                        message = 'Finalizing reports...';
+                    }
+                    res.end(JSON.stringify({
+                        stage: scanStage,
+                        processed: scanProcessedFiles,
+                        total: scanTotalFiles,
+                        gitProcessed: scanGitProcessed,
+                        gitTotal: scanGitTotal,
+                        percent,
+                        message
+                    }));
                 },
                 '/api/browse': (req, res) => {
                     if (process.platform === 'darwin') {
@@ -1209,6 +1573,7 @@ async function main() {
                                 console.log('Triggering scan for:', paths);
                                 currentTrendData = null; // Clear old trend data on fresh scan
                                 currentReport = await executeScan(paths, currentCliOptions);
+                                scanStage = 'idle';
                                 res.writeHead(200, { 'Content-Type': 'application/json' });
                                 res.end(JSON.stringify(currentReport));
                             } else {
@@ -1216,6 +1581,7 @@ async function main() {
                                 res.end('Invalid paths');
                             }
                         } catch (e: any) {
+                            scanStage = 'idle';
                             if (e.message === 'Scan cancelled') {
                                 res.writeHead(400);
                                 res.end(JSON.stringify({ error: 'Scan cancelled' }));
@@ -1231,6 +1597,38 @@ async function main() {
                     shouldCancel = true;
                     res.writeHead(200);
                     res.end('Cancellation requested');
+                },
+                '/api/decision': (req, res) => {
+                    let body = '';
+                    req.on('data', chunk => body += chunk);
+                    req.on('end', () => {
+                        try {
+                            const decision = JSON.parse(body);
+                            if (decision && decision.hash && decision.status) {
+                                const decisionsPath = path.resolve(process.cwd(), 'drydock-decisions.json');
+                                let decisions: Record<string, any> = {};
+                                if (fs.existsSync(decisionsPath)) {
+                                    decisions = JSON.parse(fs.readFileSync(decisionsPath, 'utf-8'));
+                                }
+                                decisions[decision.hash] = {
+                                    status: decision.status,
+                                    notes: decision.notes || '',
+                                    owner: decision.owner || '',
+                                    updatedAt: new Date().toISOString()
+                                };
+                                fs.writeFileSync(decisionsPath, JSON.stringify(decisions, null, 2), 'utf-8');
+                                res.writeHead(200, { 'Content-Type': 'application/json' });
+                                res.end(JSON.stringify({ success: true }));
+                            } else {
+                                res.writeHead(400);
+                                res.end('Invalid decision payload');
+                            }
+                        } catch (e: any) {
+                            console.error('Error saving decision:', e);
+                            res.writeHead(500);
+                            res.end('Error saving decision');
+                        }
+                    });
                 }
             }
         };
@@ -1240,6 +1638,7 @@ async function main() {
             const parsedUrl = new URL(req.url || '', `http://localhost:${actualPort}`);
             const method = req.method || 'GET';
             const pathname = parsedUrl.pathname;
+            console.log(`[SERVER]: ${method} ${pathname}`);
 
             setCorsHeaders(res);
 
