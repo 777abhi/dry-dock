@@ -1,6 +1,49 @@
 # dry-dock
 
-dry-dock is a utility for detecting code duplication across repositories.
+dry-dock is a modern, static-analysis utility designed to detect structural code duplication and API leakage across independent repositories.
+
+---
+
+## 🏛️ Business Perspective: Why dry-dock?
+
+In modern multi-repo and microservice architectures, **code duplication is a silent profit killer**. When multiple teams copy-paste utility functions, test configurations, database wrappers, or API models, the organization incurs substantial hidden costs:
+1. **Maintenance Drag**: A bug fixed in one repository must be manually copied to others. If one is missed, it leads to production regressions.
+2. **Quality & Test Drift**: Test automation suites (e.g., Playwright + Cucumber) drift out of sync, making quality assertions unreliable across different repositories.
+3. **Tribal Knowledge Silos**: Teams build duplicate versions of the same features, wasting valuable engineering hours.
+
+**dry-dock solves this** by scanning codebases, normalizing syntax (variable names, spaces, and comments are ignored to inspect the underlying structural logic), and outputting a prioritized **RefactorScore**. It gives engineering leaders the exact data needed to decide whether to **Centralize code into shared libraries** or **merge repositories into a Monorepo**.
+
+---
+
+## 👥 Who is this for?
+
+| Role | How they use dry-dock | Business Benefit |
+| :--- | :--- | :--- |
+| **Quality Engineering (QE) / SDETs** | Find duplicate step definitions, selectors, and test helper functions across multiple Playwright/Cucumber test repositories. | Consolidation of test automation overhead, leading to **faster, more reliable test execution** and **unified quality gates**. |
+| **Software Architects** | Audit structural "leakage" of business logic, DTOs, or database connectors across backend microservices. | Solidifies software boundaries, enables **faster architectural changes**, and ensures **easier API upgrades**. |
+| **Engineering Managers / Directors** | Track refactoring progress over time via historical trend analyses and PDF export reports. | **Data-driven prioritization** of engineering sprints to tackle high-impact technical debt. |
+| **DevOps / Platform Engineers** | Run dry-dock as a gated check in CI/CD pipelines (e.g., GitHub Actions, GitLab CI). | **Zero-accumulation policy** for new technical debt; blocks duplicate code from being merged in PRs. |
+
+---
+
+## 🚀 Key Use Cases & Realized Value
+
+### 1. Merging Fractured Test Frameworks
+* **Scenario**: Four different product teams have created identical test automation setups in Playwright, leading to duplicate config files and helper scripts.
+* **dry-dock Action**: Runs a cross-repository scan and scores the overlap. It provides a visual **Dependency Graph** and automatically recommends whether to build a shared library or merge into a Monorepo.
+* **Business Value**: Eliminates up to **40% of test maintenance hours** and ensures QA policies are applied uniformly.
+
+### 2. Identifying Microservices "Logic Leakage"
+* **Scenario**: Separate microservices copy-paste database schemas (e.g., Mongoose models) or DTO definitions to speed up development.
+* **dry-dock Action**: Highlights the duplication in the **Leakage Matrix** and estimates the complexity of the cloned logic.
+* **Business Value**: Ensures that schema changes or database security updates only need to be written and tested **once** in a centralized package, reducing release cycle times.
+
+### 3. Automated PR Governance & CI Gates
+* **Scenario**: Developers accidentally copy-paste large blocks of helper code instead of importing them.
+* **dry-dock Action**: Integrated into the CI pipeline with the `--fail` flag. If duplicate code exceeding the threshold is committed, the build fails and posts a detailed report directly onto the Pull Request.
+* **Business Value**: Prevents technical debt from entering the main codebase in real-time, preserving code quality **without manual code review overhead**.
+
+---
 
 ## Features
 
