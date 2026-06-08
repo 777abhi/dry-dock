@@ -1436,13 +1436,6 @@ async function main() {
                     const filePath2 = path.resolve(process.cwd(), file2Param);
                     const relativePath2 = path.relative(process.cwd(), filePath2);
 
-                    if (relativePath1.startsWith('..') || path.isAbsolute(relativePath1) ||
-                        relativePath2.startsWith('..') || path.isAbsolute(relativePath2)) {
-                        res.writeHead(403);
-                        res.end('Access denied: File outside of project root');
-                        return;
-                    }
-
                     const isAllowed1 = currentReport && (
                         currentReport.internal_duplicates.some(d => d.occurrences.some((o: any) => o.file === relativePath1 || o === relativePath1)) ||
                         currentReport.cross_project_leakage.some(l => l.occurrences.some(o => o.file === relativePath1))
@@ -1489,12 +1482,6 @@ async function main() {
 
                     const filePath = path.resolve(process.cwd(), fileParam);
                     const relativePath = path.relative(process.cwd(), filePath);
-
-                    if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
-                        res.writeHead(403);
-                        res.end('Access denied: File outside of project root');
-                        return;
-                    }
 
                     const isAllowed = currentReport && (
                         currentReport.internal_duplicates.some(d => d.occurrences.some((o: any) => o.file === relativePath || o === relativePath)) ||
